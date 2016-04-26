@@ -52,10 +52,10 @@ function patternbuilder_libraries_info() {
   $libraries['patternbuilder'] = array(
     // Only used in administrative UI of Libraries API.
     'title' => t('PatternBuilder'),
-    'vendor url' => 'https://web-dev-gitlab03.devlab.redhat.com/it-marketing/patternbuilder',
-    'download url' => 'https://web-dev-gitlab03.devlab.redhat.com/it-marketing/patternbuilder',
+    'vendor url' => 'https://github.com/PatternBuilder/pattern-builder-lib-php',
+    'download url' => 'https://github.com/PatternBuilder/pattern-builder-lib-php',
     'path' => 'vendor',
-    'version' => '0.0.2',
+    'version' => 'v1.0.0',
     'files' => array(
       'php' => array(
         'autoload.php',
