@@ -2,7 +2,7 @@
     "name": "Drupal/PatternBuilder",
     "description": "Provides integration between the PatternBuilder library and Drupal projects",
     "require": {
-        "pattern-builder/pattern-builder": "0.9.3"
+        "pattern-builder/pattern-builder": "v1.0.0"
     },
     "repositories": [
       {
