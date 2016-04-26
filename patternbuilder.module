@@ -1205,10 +1205,9 @@ function patternbuilder_field_widget_settings_form($field, $instance) {
  * Implements hook_field_widget_form().
  */
 function patternbuilder_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  $widget = $instance['widget'];
   $elements = array();
 
-  if ($widget['type'] == 'patternbuilder_paragraphs_embed') {
+  if ($instance['widget']['type'] == 'patternbuilder_paragraphs_embed') {
     $elements = patternbuilder_paragraphs_field_multiple_value_form($field, $instance, $langcode, $items, $form, $form_state, $delta, $element);
   }
 
@@ -1225,7 +1224,8 @@ function patternbuilder_field_widget_form(&$form, &$form_state, $field, $instanc
  * @see paragraphs_field_widget_form_build()
  */
 function patternbuilder_field_widget_form_build(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  return paragraphs_field_widget_form_build($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
+  $element = paragraphs_field_widget_form_build($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
+  return $element;
 }
 
 /**

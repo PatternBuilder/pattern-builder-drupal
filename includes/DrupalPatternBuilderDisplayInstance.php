@@ -137,7 +137,7 @@ class DrupalPatternBuilderDisplayInstance {
     $this->fieldType = $field['type'];
     $this->instance = $field_instance;
     $this->display = $field_display;
-    $this->language = field_language($this->entityType, $this->entity, $this->instance['field_name'], $langcode);
+    $this->language = DrupalPatternBuilder::field_language($this->entityType, $this->entity, $this->instance['field_name'], $langcode);
 
     $this->prepare();
   }
@@ -315,17 +315,26 @@ class DrupalPatternBuilderDisplayInstance {
   protected function viewField() {
     $renders = array();
     $field_name = $this->instance['field_name'];
-    $items = field_get_items($this->entityType, $this->entity, $field_name, $this->language);
-    if ($items) {
-      // Process items.
-      foreach ($items as $delta => $item) {
-        // Build the item render.
-        $item_render = field_view_value($this->entityType, $this->entity, $field_name, $item, $this->display, $this->language);
 
-        // Render the item.
-        $item_rendered = render($item_render);
-        if ($item_rendered) {
-          $renders[$delta] = $item_rendered;
+    // Process items.
+    // Note: Using field_view_field() avoid issue with field_view_value()
+    // not finding the correct language due to field_language() static cache
+    // indexed by entity type and id which fails for multiple new entities of
+    // the same entity type that do not have an id.
+    $item_renders = field_view_field($this->entityType, $this->entity, $field_name, $this->display, $this->language);
+    if ($item_renders && ($deltas = element_children($item_renders))) {
+      foreach ($deltas as $delta) {
+        if (is_numeric($delta)) {
+          // Propogate #access to each item.
+          // @see field_view_value()
+          if (isset($item_renders['#access'])) {
+            $item_renders[$delta]['#access'] = $item_renders['#access'];
+          }
+
+          $item_rendered = render($item_renders[$delta]);
+          if ($item_rendered) {
+            $renders[$delta] = $item_rendered;
+          }
         }
       }
     }
@@ -345,7 +354,7 @@ class DrupalPatternBuilderDisplayInstance {
     }
 
     $field_name = $this->instance['field_name'];
-    $items = field_get_items($this->entityType, $this->entity, $field_name, $this->language);
+    $items = DrupalPatternBuilder::field_get_items($this->entityType, $this->entity, $field_name, $this->language);
     if (empty($items)) {
       return array();
     }
@@ -455,6 +464,8 @@ class DrupalPatternBuilderDisplayInstance {
 
       // Patternbuilder settings.
       $this->pbSettings = _patternbuilder_field_instance_settings($this->instance);
+
+      // Set property map.
       if (!empty($this->pbSettings['property_map_array'])) {
         $this->propertyMap = $this->pbSettings['property_map_array'];
       }

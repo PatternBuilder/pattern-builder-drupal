@@ -114,10 +114,22 @@ class DrupalPatternBuilder {
     $this->schemaController = patternbuilder_get($this->twigEnvOptions);
 
     // Create the root component.
+    $this->initComponent();
+  }
+
+  /**
+   * Initialize the root component.
+   */
+  protected function initComponent() {
+    $this->builtViewMode = NULL;
     $component = $this->loadSchemaByEntity($this->entityType, $this->entity);
     if ($component) {
       $this->isSchemaEntity = TRUE;
       $this->component = $component;
+    }
+    else {
+      $this->isSchemaEntity = FALSE;
+      $this->component = NULL;
     }
   }
 
@@ -144,7 +156,7 @@ class DrupalPatternBuilder {
   }
 
   /**
-   * Determines if conditions are mt to build the object.
+   * Determines if conditions are met to build the object.
    *
    * @return bool
    *   TRUE if object can be built.
@@ -239,7 +251,7 @@ class DrupalPatternBuilder {
         }
 
         // Check field values.
-        $field_items = field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::field_get_items($entity_type, $entity, $field_name);
         if (!empty($field_items)) {
           foreach ($field_items as $field_delta => $field_item) {
             // Assume value key is the first value.
@@ -287,7 +299,17 @@ class DrupalPatternBuilder {
    *   Rendered markup.
    */
   public function render($view_mode = 'full') {
-    $this->build($this->component, $this->entityType, $this->entity, $view_mode);
+    if (empty($this->builtViewMode)) {
+      // First time building.
+      $this->build($this->component, $this->entityType, $this->entity, $view_mode);
+    }
+    elseif ($this->builtViewMode !== $view_mode) {
+      // Reinitialize the component when this builder is re-used for different
+      // view mode.
+      $this->initComponent();
+      $this->build($this->component, $this->entityType, $this->entity, $view_mode);
+    }
+
     $this->setComponentMetaData();
     return $this->component->render();
   }
@@ -348,7 +370,7 @@ class DrupalPatternBuilder {
    */
   protected function build(&$component, $entity_type, $entity, $view_mode = 'full', $field_name = NULL) {
     // Exit if built already OR cannot build.
-    if ($this->builtViewMode === $view_mode || !$this->canBuild()) {
+    if (!empty($this->builtViewMode) || !$this->canBuild()) {
       return $this;
     }
 
@@ -371,12 +393,12 @@ class DrupalPatternBuilder {
 
       if (isset($entity_wrapper->{$field_name}) && $display->canRender()) {
         $field_display = $display->getDisplay();
-        $field_items = field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::field_get_items($entity_type, $entity, $field_name);
+
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
           $field_data_type = entity_property_extract_innermost_type($field_data_type_defined);
           $field_is_reference = in_array($field_data_type, $ref_entity_types, TRUE);
-
           if ($field_is_reference) {
             // Reference field.
             $ref_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
@@ -421,7 +443,7 @@ class DrupalPatternBuilder {
       }
 
       // Set flag when the root entity is built.
-      if ($entity_id == $this->entityId && $entity_revision_id == $this->entityRevisionId) {
+      if ($this->entityId && $entity_id == $this->entityId && $this->entityRevisionId && $entity_revision_id == $this->entityRevisionId) {
         $this->builtViewMode = $view_mode;
       }
 
@@ -610,15 +632,89 @@ class DrupalPatternBuilder {
   protected static function loadReferenceItemEntity($entity_type, array $item, $skip_existing_entity = FALSE) {
     $values = static::getReferenceItemEntityValues($entity_type, $item);
 
-    if (!$skip_existing_entity && isset($values['entity'])) {
+    if (!$skip_existing_entity && !empty($values['entity'])) {
       return $values['entity'];
     }
-    elseif (isset($values['revision_id'])) {
+    elseif (!empty($values['revision_id'])) {
       return entity_revision_load($entity_type, $values['revision_id']);
     }
-    elseif (isset($values['id'])) {
+    elseif (!empty($values['id'])) {
       return entity_load_single($entity_type, $values['id']);
     }
+  }
+
+  /**
+   * Helper function to overcome caveats of field_language().
+   *
+   * The function field_language() has a static cache indexed by entity type
+   * and entity id. This causes a collision when multiple new entities of the
+   * same entity type are rendered.
+   *
+   * @param string $entity_type
+   *   The entity type.
+   * @param object $entity
+   *   The entity object.
+   * @param string $field_name
+   *   The field name.
+   * @param string $langcode
+   *   Optional. The language code.
+   *
+   * @return array
+   *   The items array.
+   */
+  public static function field_get_items($entity_type, $entity, $field_name, $langcode = NULL) {
+    $langcode = static::field_language($entity_type, $entity, $field_name, $langcode);
+    return isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : FALSE;
+  }
+
+  /**
+   * Helper function to overcome caveats of field_language().
+   *
+   * The function field_language() has a static cache indexed by entity type
+   * and entity id. This causes a collision when multiple new entities of the
+   * same entity type and different bundle are rendered.
+   *
+   * Drupal core issue: https://www.drupal.org/node/2201251
+   * This function overcomes this issue by generating fake ids. This reduces
+   * the need for a core patch to utilize patternbuilder with the
+   * paragraphs_previewer module.
+   *
+   * @param string $entity_type
+   *   The entity type.
+   * @param object $entity
+   *   The entity object.
+   * @param string $field_name
+   *   The field name.
+   * @param string $langcode
+   *   Optional. The language code.
+   *
+   * @return string
+   *   The field language code.
+   */
+  public static function field_language($entity_type, $entity, $field_name, $langcode = NULL) {
+    // Store fake ids for new entities to avoid field_language() cache issue.
+    static $drupal_static_fast;
+    if (!isset($drupal_static_fast)) {
+      $drupal_static_fast['id'] = &drupal_static('DrupalPatternBuilder::' . __FUNCTION__);
+    }
+    $fake_id = &$drupal_static_fast['id'];
+
+    $info = entity_get_info($entity_type);
+    if (empty($entity->{$info['entity keys']['id']})) {
+      // Generate a fake id to bypass the field_language cache.
+      $fake_id++;
+      $id = 'pb' . $fake_id;
+      $entity->{$info['entity keys']['id']} = $id;
+      $langcode = field_language($entity_type, $entity, $field_name, $langcode);
+      $field_language_cache = &drupal_static('field_language', array());
+      unset($field_language_cache[$entity_type][$id]);
+      $entity->{$info['entity keys']['id']} = NULL;
+    }
+    else {
+      $langcode = field_language($entity_type, $entity, $field_name, $langcode);
+    }
+
+    return $langcode;
   }
 
 }

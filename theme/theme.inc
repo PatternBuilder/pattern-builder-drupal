@@ -28,7 +28,10 @@ function template_preprocess_patternbuilder_items(&$vars) {
  * Process variables for paragraphs-item.tpl.php.
  */
 function template_preprocess_patternbuilder_item(&$vars) {
-  $entity_type = $vars['elements']['#entity_type'];
+  if (isset($vars['elements']['#entity_type']) && $vars['elements']['#entity_type'] != 'paragraphs_item') {
+    return;
+  }
+  $entity_type = 'paragraphs_item';
   $vars['entity_type'] = $entity_type;
 
   $langcode = !empty($vars['elements']['#language']) ? $vars['elements']['#language'] : LANGUAGE_NONE;

@@ -27,7 +27,31 @@ class pbi_field_paragraph extends pbi_field {
    * {@inheritdoc}
    */
   protected function determine_field_widget($property, array $base, array $instance) {
-    return array('type' => 'patternbuilder_paragraphs_embed');
+    $widget = array(
+      'type' => 'patternbuilder_paragraphs_embed',
+    );
+
+    if (module_exists('paragraphs_previewer')) {
+      $widget['settings'] = array(
+        'paragraphs_previewer_enabled' => variable_get('patternbuilder_default_paragraphs_previewer_enabled', 1),
+      );
+    }
+
+    return $widget;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function determine_default_field_formatter($property, array $base, array $instance) {
+    $formatter = parent::determine_default_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      $formatter = array(
+        'type' => 'patternbuilder_view',
+      );
+    }
+
+    return $formatter;
   }
 
   /**
@@ -39,7 +63,7 @@ class pbi_field_paragraph extends pbi_field {
     // Default settings.
     $field['instance']['settings']['title'] = variable_get('patternbuilder_default_paragraphs_item_title', 'Pattern');
     $field['instance']['settings']['title_multiple'] = variable_get('patternbuilder_default_paragraphs_item_title_plural', 'Patterns');
-    $field['instance']['settings']['default_edit_mode'] = 'closed';
+    $field['instance']['settings']['default_edit_mode'] = variable_get('patternbuilder_default_paragraphs_item_edit_mode', 'closed');
 
     // Set allowed schemas.
     if (!empty($field['instance'])) {
@@ -58,7 +82,7 @@ class pbi_field_paragraph extends pbi_field {
       }
 
       if (isset($items)) {
-        $settings = $this->build_widget($items);
+        $settings = $this->build_paragraphs_bundle_settings($items);
         $field['instance']['settings'] = array_merge($field['instance']['settings'], $settings);
       }
     }
@@ -78,7 +102,7 @@ class pbi_field_paragraph extends pbi_field {
    * @return array
    *   Settings array for the widget.
    */
-  private function build_widget(array $items) {
+  private function build_paragraphs_bundle_settings(array $items) {
     $bundle_weight = 0;
     $settings = array();
 
