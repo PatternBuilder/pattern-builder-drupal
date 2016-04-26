@@ -1,0 +1,15 @@
+name = PatternBuilder
+description = Provides intergration with the PatternBuilder library.
+core = 7.x
+dependencies[] = libraries
+dependencies[] = paragraphs
+dependencies[] = field_group
+dependencies[] = field_collection
+files[] = includes/PatternBuilder/Schema/DrupalPatternBuilderSchema.php
+files[] = includes/Psr/Log/DrupalPatternBuilderLog.php
+files[] = includes/PatternBuilder/Property/Component/DrupalPatternBuilderComponent.php
+files[] = includes/JsonSchema/DrupalPatternBuilderRefResolver.php
+files[] = includes/DrupalPatternBuilder.php
+files[] = includes/DrupalPatternBuilderDisplayInstance.php
+files[] = includes/PatternBuilder/Property/DrupalPatternBuilderValueProperty.php
+files[] = views/handlers/patternbuilder_views_handler_argument_pattern_type.inc

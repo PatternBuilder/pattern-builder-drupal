@@ -1,0 +1,634 @@
+<?php
+/**
+ * @file
+ * Primary module for importing patterns.
+ */
+
+/**
+ * Implements hook_hook_info().
+ */
+function patternbuilder_importer_hook_info() {
+  $base_info = array('group' => 'patternbuilder_importer');
+
+  return array(
+    'patternbuilder_importer_field_instance_settings_alter' => $base_info,
+    'patternbuilder_importer_property_formatter' => $base_info,
+    'patternbuilder_importer_property_formatter_alter' => $base_info,
+    'patternbuilder_importer_property_default_value_alter' => $base_info,
+    'patternbuilder_importer_field_import_alter' => $base_info,
+  );
+}
+
+/**
+ * Print a message during import.
+ *
+ * @param string $message
+ *   The message to display.
+ * @param string $type
+ *   Optional. The message type per drush_print's defintion.
+ *   Available types: 'warning', 'error', 'success' and 'notice'.
+ *   A type of 'failed' can also be supplied to flag as an 'error'.
+ *   A type of 'ok' or 'completed' can also be supplied to flag as a 'success'.
+ * @param bool $append_newline
+ *   Append a new line to the output.
+ */
+function _patternbuilder_importer_print($message, $type = NULL, $append_newline = TRUE) {
+  $drush_active = function_exists('drush_log');
+
+  if ($drush_active) {
+    if ($type) {
+      drush_log($message, $type);
+    }
+    else {
+      drush_print($message, 0, NULL, $append_newline);
+    }
+  }
+  else {
+    if (!$type || $type == 'notice' || $type == 'success' || $type == 'ok') {
+      $type = 'status';
+    }
+    elseif ($type == 'failed') {
+      $type = 'error';
+    }
+    drupal_set_message(check_plain($message), $type);
+  }
+}
+
+/**
+ * Import pattern schemas.
+ *
+ * If no argument is provided then all schemas are imported.
+ * If $schema_names and $pattern_types are provided then the imported schemas
+ * are all $schema_names of type $pattern_types.
+ *
+ * @param array $schema_names
+ *   Optional. A list of schema machine names.
+ * @param array $pattern_types
+ *   Optional. A list of pattern type machine names.
+ *
+ * @return bool
+ *   TRUE if schemas were imported, else FALSE.
+ */
+function patternbuilder_importer_import_schemas(array $schema_names = array(), array $pattern_types = array()) {
+  patternbuilder_importer_invalidate_cache();
+  $all_schema_files = patternbuilder_get_schemas(TRUE);
+  $schema_files = $all_schema_files;
+
+  if (empty($all_schema_files)) {
+    watchdog('patternbuilder_importer', 'There were no schema files found to import.', WATCHDOG_WARNING);
+    return FALSE;
+  }
+  elseif (!empty($schema_names)) {
+    $schema_files = array_intersect_key($all_schema_files, array_combine($schema_names, $schema_names));
+    if (empty($schema_files)) {
+      watchdog('patternbuilder_importer', 'There were no schema files found for the following: @schemas.', array(
+        '@schemas' => implode(', ', $schema_names),
+      ), WATCHDOG_WARNING);
+      return FALSE;
+    }
+  }
+
+  // Rebuild pattern types cache to ensure new types are imported.
+  $rebuild_types = TRUE;
+  $all_pattern_types = patternbuilder_get_pattern_types(NULL, $rebuild_types);
+
+  if (empty($pattern_types)) {
+    $pattern_types_imported = $all_pattern_types;
+  }
+  else {
+    $pattern_types_imported = array_intersect_key($all_pattern_types, array_combine($pattern_types, $pattern_types));
+  }
+
+  // Process pattern types in weighted order.
+  $schema_files_pending = $schema_files;
+  foreach ($pattern_types_imported as $type_name => $type_info) {
+    $msg_tokens = array(
+      '@type' => $type_name,
+    );
+
+    $patterns_loaded = patternbuilder_importer_load_json($schema_files_pending, $type_name);
+    if ($patterns_loaded) {
+      _patternbuilder_importer_print(t('Importing schemas for pattern type: @type...', $msg_tokens));
+      patternbuilder_importer_process_properties($patterns_loaded);
+      $schema_files_pending = array_diff_key($schema_files_pending, $patterns_loaded);
+      _patternbuilder_importer_print(t('Completed schemas for pattern type: @type', $msg_tokens), 'success');
+    }
+  }
+
+  return TRUE;
+}
+
+/**
+ * Loads JSON Schema files into memory.
+ *
+ * @param array $jsonschema_files
+ *   Array of file paths to JSON Schema files keyed by machine name.
+ * @param string $pattern_type_name
+ *   Optional. Pattern type machine name. If not provided, then all pattern
+ *   types are loaded.
+ *
+ * @return array
+ *   An array keyed by machine name with values of schema info with keys of:
+ *   - 'pattern_type': Determined pattern type.
+ *   - 'schema': File contents JSON decoded.
+ */
+function patternbuilder_importer_load_json(array $jsonschema_files, $pattern_type_name = NULL) {
+  $contents = array();
+
+  if (isset($pattern_type_name)) {
+    // Limit to a single pattern type.
+    $pattern_type = patternbuilder_get_pattern_types($pattern_type_name);
+
+    // Skip undefined types.
+    if (!isset($pattern_type)) {
+      return array();
+    }
+
+    $pattern_types = array($pattern_type_name => $pattern_type);
+  }
+  else {
+    // Load all pattern types.
+    $pattern_types = patternbuilder_get_pattern_types();
+  }
+
+  // Exit if no types.
+  if (empty($pattern_types)) {
+    return array();
+  }
+
+  // Build claimers.
+  $type_claimers = array();
+  foreach ($pattern_types as $type_name => $type_info) {
+    if (isset($type_info['claim_by_name']) && function_exists($type_info['claim_by_name'])) {
+      $type_claimers[$type_name]['name'] = $type_info['claim_by_name'];
+    }
+
+    if (isset($type_info['claim_by_schema']) && function_exists($type_info['claim_by_schema'])) {
+      $type_claimers[$type_name]['schema'] = $type_info['claim_by_schema'];
+    }
+  }
+
+  // Set generic types.
+  $generic_types = array_diff_key($pattern_types, $type_claimers);
+  $top_generic_type = !empty($generic_types) ? reset($generic_types) : NULL;
+
+  // Process schemas.
+  if (empty($type_claimers)) {
+    // Un-filtered, set type to the top generic.
+    if (isset($top_generic_type['name'])) {
+      foreach ($jsonschema_files as $machine_name => $jsonschema_file) {
+        if (file_exists($jsonschema_file)) {
+          $pattern_schema = patternbuilder_importer_file_get_schema_object($jsonschema_file);
+          if ($pattern_schema) {
+            $contents[$machine_name]['schema'] = $pattern_schema;
+            $contents[$machine_name]['pattern_type'] = $top_generic_type['name'];
+          }
+        }
+      }
+    }
+  }
+  else {
+    foreach ($jsonschema_files as $machine_name => $jsonschema_file) {
+      $claimed = FALSE;
+      $claimed_type = '';
+      $pattern_schema = NULL;
+
+      foreach ($type_claimers as $type_name => $claimer_functions) {
+        foreach ($claimer_functions as $claimer_type => $claimer_function) {
+          $pattern_schema = NULL;
+
+          switch ($claimer_type) {
+            case 'name':
+              $claimed = $claimer_function($machine_name);
+              break;
+
+            case 'schema':
+              $pattern_schema = patternbuilder_importer_file_get_schema_object($jsonschema_file);
+              if ($pattern_schema) {
+                $claimed = $claimer_function($machine_name, $pattern_schema);
+              }
+              break;
+          }
+
+          if ($claimed) {
+            $claimed_type = $type_name;
+            break 2;
+          }
+        }
+      }
+
+      if (!$claimed_type && isset($top_generic_type['name'])) {
+        $claimed_type = $top_generic_type['name'];
+      }
+
+      if ($claimed_type) {
+        $claimed_schema = patternbuilder_importer_file_get_schema_object($jsonschema_file);
+        if ($claimed_schema) {
+          $contents[$machine_name]['schema'] = clone $claimed_schema;
+          $contents[$machine_name]['pattern_type'] = $claimed_type;
+        }
+      }
+    }
+  }
+
+  return $contents;
+}
+
+/**
+ * Reset the schema object static cache.
+ */
+function patternbuilder_importer_invalidate_cache() {
+  // Fully built schemas could reference a schema that has changed so all
+  // cached schema objects must be purged.
+  patternbuilder_invalidate_cache();
+  drupal_static_reset('patternbuilder_importer_file_get_schema_object');
+}
+
+/**
+ * Loads JSON Schema files into memory.
+ *
+ * @param string $jsonschema_file
+ *   The file path to the JSON Schema file.
+ * @param bool $reset
+ *   Reset the static cache.
+ *
+ * @return object
+ *   JSON decoded schema object else FALSE
+ */
+function patternbuilder_importer_file_get_schema_object($jsonschema_file, $reset = FALSE) {
+  // Cache to track files so that they are processed only once.
+  $cache = &drupal_static(__FUNCTION__, array());
+
+  if ($reset) {
+    $cache = array();
+  }
+
+  if (!isset($cache[$jsonschema_file])) {
+    // Initialize cache to "could not load".
+    $cache[$jsonschema_file] = FALSE;
+
+    $file_basename = basename($jsonschema_file, '.json');
+
+    $error_message = '';
+    if (!file_exists($jsonschema_file)) {
+      $error_message = 'The schema file does not exist: "@file".';
+    }
+    elseif (strpos($file_basename, '-') !== FALSE) {
+      // Hyphens are replaced with underscore, @see paragraphs_bundle_load().
+      $error_message = 'The schema file name contains an invalid hyphen: "@file".';
+    }
+    elseif (!($file_contents = file_get_contents($jsonschema_file))) {
+      $error_message = 'The schema file is empty: "@file".';
+    }
+    elseif (!($object = json_decode($file_contents))) {
+      $error_message = 'The schema file could not be decoded: "@file". This is usually caused by malformed JSON in the schema file.';
+    }
+
+    if (!empty($object)) {
+      // Set cache to json object.
+      $cache[$jsonschema_file] = $object;
+    }
+    else {
+      // File could not be loaded.
+      $cache[$jsonschema_file] = FALSE;
+      if (!$error_message) {
+        $error_message = 'The schema file "@file" could not be loaded.';
+      }
+
+      watchdog('patternbuilder_importer', $error_message, array(
+        '@file' => $jsonschema_file,
+      ), WATCHDOG_WARNING);
+    }
+  }
+
+  return $cache[$jsonschema_file];
+}
+
+/**
+ * Loops through components and creates bundles/fields.
+ *
+ * @param array $patterns
+ *   An array with keys of:
+ *   - 'pattern_type': Determined pattern type.
+ *   - 'schema': File contents JSON decoded.
+ */
+function patternbuilder_importer_process_properties(array $patterns) {
+  // Create bundles first so fields can reference other bundles.
+  _patternbuilder_importer_print(t('Processing bundles and field bases...'), NULL, FALSE);
+  foreach ($patterns as $machine_name => &$pattern_info) {
+    if (!isset($pattern_info['schema'])) {
+      continue;
+    }
+
+    $pattern_type_name = isset($pattern_info['pattern_type']) ? $pattern_info['pattern_type'] : '';
+    if (empty($pattern_type_name)) {
+      $pattern_type_name = $pattern_info['pattern_type'] = patternbuilder_default_pattern_type();
+    }
+
+    // Determine if pattern is a field.
+    $pattern_info['is_resolved'] = FALSE;
+    $pattern_info['is_single_field'] = FALSE;
+    if ($pattern_type_name) {
+      $pattern_type = patternbuilder_get_pattern_types($pattern_type_name);
+      if ($pattern_type) {
+        $pattern_info['is_resolved'] = !empty($pattern_type['resolve']);
+        $pattern_info['is_single_field'] = !empty($pattern_type['field']);
+      }
+    }
+
+    $pattern_label = isset($pattern_info['schema']->title) ? $pattern_info['schema']->title : $machine_name;
+    if (empty($pattern_info['is_resolved'])) {
+      // Schema imported to a paragraph bundle.
+      patternbuilder_importer_create_bundle($pattern_info['schema'], $machine_name, $pattern_label, $pattern_type_name);
+    }
+    elseif (!empty($pattern_info['is_single_field'])) {
+      // Schema imported to a field.
+      patternbuilder_importer_create_field($pattern_info['schema'], $machine_name, $pattern_label, $pattern_type_name);
+    }
+  }
+
+  // Clear reference.
+  unset($pattern_info);
+
+  _patternbuilder_importer_print(t('done.'));
+
+  // Load the components map.
+  // Covers the issue if another process is also adding components.
+  $components_map = patternbuilder_components_load(NULL, TRUE);
+
+  // Provision fields on bundles.
+  foreach ($patterns as $machine_name => $pattern_info) {
+    if (!empty($pattern_info['is_resolved'])) {
+      continue;
+    }
+
+    $msg_tokens = array(
+      '@name' => $machine_name,
+    );
+    _patternbuilder_importer_print(t('Processing fields for @name...', $msg_tokens), NULL, FALSE);
+    $component_map = isset($components_map[$machine_name]) ? $components_map[$machine_name] : NULL;
+    if (isset($pattern_info['schema']) && !empty($component_map->id) && !empty($component_map->bundle_name)) {
+      if (isset($pattern_info['schema']->properties)) {
+        $weight = 0;
+        $factory = patternbuilder_importer_create_factory($component_map->id, $component_map->bundle_name, $weight);
+        if (isset($factory)) {
+          $required_properties = isset($pattern_info['schema']->required) ? $pattern_info['schema']->required : array();
+          $factory->process_properties($pattern_info['schema']->properties, $required_properties);
+        }
+      }
+    }
+
+    _patternbuilder_importer_print(t('done.'));
+  }
+}
+
+/**
+ * Creates the paragraphs bundle or updates existing.
+ *
+ * @param string $schema
+ *   The schema object.
+ * @param string $machine_name
+ *   Machine name for the component.
+ * @param string $label
+ *   Human readable name of the bundle.
+ * @param string $pattern_type_name
+ *   The pattern type machine name.
+ *
+ * @return object
+ *   The bundle object.
+ */
+function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $pattern_type_name = 'pb_default') {
+  $bundle_prefix = 'pbi';
+
+  // Set default pattern type.
+  if (empty($pattern_type_name)) {
+    $pattern_type_name = patternbuilder_default_pattern_type();
+  }
+
+  // Get pattern type bundle data.
+  if ($pattern_type_name) {
+    $pattern_type = patternbuilder_get_pattern_types($pattern_type_name);
+    if (!empty($pattern_type)) {
+      if (isset($pattern_type['prefix'])) {
+        $bundle_prefix = $pattern_type['prefix'];
+      }
+    }
+  }
+
+  // Create bundle label.
+  $bundle_label = drupal_ucfirst($label);
+
+  // Create bundle object.
+  $bundle = new stdClass();
+  $bundle->bundle = ($bundle_prefix ? $bundle_prefix . '_' : '') . $machine_name;
+  $bundle->name = $bundle_label;
+  $bundle->locked = 0;
+
+  // Paragraph bundle names are limited to 32.
+  if (drupal_strlen($bundle->bundle) >= 32) {
+    $hash = md5($bundle->bundle);
+
+    $stored_hashes = variable_get('patternbuilder_importer_bundle_hashes', array());
+    $stored_hashes[$hash] = $bundle->bundle;
+    variable_set('patternbuilder_importer_bundle_hashes', $stored_hashes);
+
+    $bundle->bundle = $hash;
+  }
+
+  $saved_status = paragraphs_bundle_save($bundle);
+  if ($saved_status == SAVED_NEW || $saved_status == SAVED_UPDATED) {
+    if (!empty($bundle->bundle)) {
+      // Save component mapping - insert or update.
+      patternbuilder_component_save($machine_name, $pattern_type_name, $bundle->bundle);
+    }
+
+    return $bundle;
+  }
+}
+
+/**
+ * Creates the paragraphs bundle or updates existing.
+ *
+ * @param string $schema
+ *   The schema object.
+ * @param string $machine_name
+ *   Machine name for the component.
+ * @param string $label
+ *   Human readable name of the field.
+ * @param string $pattern_type_name
+ *   The pattern type machine name.
+ *
+ * @return object
+ *   The component object.
+ */
+function patternbuilder_importer_create_field($schema, $machine_name, $label, $pattern_type_name = 'pb_default') {
+  // Custom prefix to avoid collisions with the fields created in the field UI.
+  $field_prefix = 'pbi';
+
+  // Set default pattern type.
+  if (empty($pattern_type_name)) {
+    $pattern_type_name = patternbuilder_default_pattern_type();
+  }
+
+  // Get existing component.
+  $component = patternbuilder_components_load($machine_name);
+
+  // Create / update component.
+  if (empty($component->field_name)) {
+    // Create a new field name: [prefix]_[name].
+    $field_name = pbi_utility::create_unique_name($field_prefix, $machine_name);
+    patternbuilder_component_save($machine_name, $pattern_type_name, NULL, $field_name);
+  }
+
+  return !empty($component->field_name) ? $component : NULL;
+}
+
+/**
+ * Get the class name of the default importer factory.
+ *
+ * @return string|null
+ *   A class name.
+ */
+function patternbuilder_importer_default_factory_class_name() {
+  return variable_get('patternbuilder_importer_default_factory_class', 'pbi_factory');
+}
+
+/**
+ * Create an instance of the default importer factory.
+ *
+ * @param int|string $id
+ *   ID for the pattern.
+ * @param string $bundle_name
+ *   The machine name of the entity bundle.
+ * @param int $weight
+ *   Weight for field ordering.
+ * @param string|null $entity_type
+ *   The entity type. If not provided, then the factory's default entity type
+ *   is used.
+ *
+ * @return pbi_factory|null
+ *   An instance of the importer factory.
+ */
+function patternbuilder_importer_create_factory($id, $bundle_name, &$weight, $entity_type = NULL) {
+  $default_factory = patternbuilder_importer_default_factory_class_name();
+  if ($default_factory) {
+    return new $default_factory($id, $bundle_name, $weight, $entity_type);
+  }
+}
+
+/**
+ * Retrieves the default formatter for a given schema property.
+ *
+ * This is used by the importer to determine a fields default formatter.
+ *
+ * @param object $property
+ *   The full property object.
+ * @param array $field_base
+ *   The built field base array.
+ * @param array $field_instance
+ *   The built field instance array.
+ *
+ * @return array
+ *   A single formatter array for a Drupal field display.
+ */
+function patternbuilder_importer_get_property_default_formatter($property, array $field_base, array $field_instance) {
+  $formatters = patternbuilder_importer_available_property_formatters($property, $field_base, $field_instance);
+  return $formatters ? reset($formatters) : array();
+}
+
+/**
+ * Retrieves all available formatters for a given schema property.
+ *
+ * This is used by the importer to determine a fields formatter.
+ *
+ * @param object $property
+ *   The full property object.
+ * @param array $field_base
+ *   The built field base array.
+ * @param array $field_instance
+ *   The built field instance array.
+ *
+ * @return array
+ *   An array of formatters sorted by weight.
+ */
+function patternbuilder_importer_available_property_formatters($property, array $field_base, array $field_instance) {
+  $formatters_unordered = array();
+  $context = array(
+    'property' => $property,
+    'field_base' => $field_base,
+    'field_instance' => $field_instance,
+  );
+
+  foreach (module_implements('patternbuilder_importer_property_formatter') as $module) {
+    $module_formatters = module_invoke($module, 'patternbuilder_importer_property_formatter', $context);
+    if (empty($module_formatters)) {
+      continue;
+    }
+    foreach ($module_formatters as $index => $formatter_info) {
+      if (isset($formatter_info['type'])) {
+        $formatter = $formatter_info;
+        $formatter['pb_module'] = $module;
+        $formatters_unordered["{$module}::{$index}"] = $formatter;
+      }
+    }
+  }
+
+  $formatters = array();
+  if ($formatters_unordered) {
+    drupal_alter('patternbuilder_importer_property_formatter', $formatters_unordered, $context);
+
+    $pb_weights = array();
+    foreach ($formatters_unordered as $index => $formatter) {
+      $pb_weights[$index] = isset($formatter['pb_weight']) ? $formatter['pb_weight'] : 0;
+    }
+
+    asort($pb_weights);
+    foreach ($pb_weights as $index => $weight) {
+      $formatters[$index] = $formatters_unordered[$index];
+
+      // Remove custom properties.
+      unset($formatters[$index]['pb_weight']);
+      unset($formatters[$index]['pb_module']);
+    }
+  }
+
+  return $formatters;
+}
+
+/**
+ * Retrieves the default value for a given property.
+ *
+ * @param object $property
+ *   The full property object.
+ * @param array $field_base
+ *   The built field base array.
+ * @param array $field_instance
+ *   The built field instance array.
+ * @param array $allowed_values
+ *   An array of allowed values, if any.
+ *
+ * @return array
+ *   A single formatter array for a Drupal field display.
+ */
+function patternbuilder_importer_get_property_default_value($property, array $field_base, array $field_instance, array $allowed_values = array()) {
+  $value = NULL;
+  if (isset($property->default)) {
+    // Set to the provided default.
+    $value = $property->default;
+  }
+  elseif (count($allowed_values) == 1) {
+    // Set to first key if there is only 1.
+    reset($allowed_values);
+    $value = key($allowed_values);
+  }
+
+  $context = array(
+    'property' => $property,
+    'field_base' => $field_base,
+    'field_instance' => $field_instance,
+    'allowed_values' => $allowed_values,
+  );
+  drupal_alter('patternbuilder_importer_property_default_value', $value, $context);
+
+  return $value;
+}

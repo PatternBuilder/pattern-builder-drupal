@@ -1,0 +1,100 @@
+<?php
+/**
+ * @file
+ * Default theme functions for paragraphs.
+ */
+
+/**
+ * Process variables for paragraphs-items.tpl.php.
+ */
+function template_preprocess_patternbuilder_items(&$vars) {
+  $vars['view_mode'] = $vars['element']['#view_mode'];
+  $vars['field_name'] = $vars['element']['#field_name'];
+
+  // Helpful $content variable for templates.
+  $vars['content'] = array();
+  foreach (element_children($vars['element']) as $key) {
+    $vars['content'][$key] = $vars['element'][$key];
+  }
+
+  // Build classes.
+  $vars['classes_array'][] = drupal_html_class('patternbuilder_items__' . $vars['element']['#field_name']);
+
+  // Add theme suggestions.
+  $vars['theme_hook_suggestions'][] = 'patternbuilder_items__' . $vars['element']['#field_name'];
+}
+
+/**
+ * Process variables for paragraphs-item.tpl.php.
+ */
+function template_preprocess_patternbuilder_item(&$vars) {
+  $entity_type = $vars['elements']['#entity_type'];
+  $vars['entity_type'] = $entity_type;
+
+  $langcode = !empty($vars['elements']['#language']) ? $vars['elements']['#language'] : LANGUAGE_NONE;
+  $vars['language'] = $langcode;
+
+  $entity = $vars['elements']['#entity'];
+  $vars[$vars['elements']['#entity_type']] = $entity;
+
+  $entity_info = entity_get_info($entity_type);
+  list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+
+  $view_mode = 'full';
+  if (!empty($vars['elements']['#view_mode']) && isset($entity_info['view modes'][$vars['elements']['#view_mode']])) {
+    $view_mode = $vars['elements']['#view_mode'];
+  }
+  $vars['view_mode'] = $view_mode;
+
+  // Helpful $content variable for templates.
+  $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
+
+  // Build css classes.
+  $vars['classes_array'][] = drupal_html_class('patternbuilder-item--' . $bundle);
+
+  // Add theme suggestions.
+  $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $bundle;
+  if ($id = entity_id($entity_type, $entity)) {
+    $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $id;
+  }
+}
+
+/**
+ * Render a paragraph with the defined schema.
+ *
+ * @param ParagraphsItemEntity $entity
+ *   The paragraph item entity object used to stored the schema input data.
+ * @param string $view_mode
+ *   The view mode to render.
+ * @param string $langcode
+ *   The language to render.
+ *
+ * @return array
+ *   A renderable array.
+ */
+function patternbuilder_render_schema(ParagraphsItemEntity $entity, $view_mode = 'full', $langcode = NULL) {
+  $entity_type = 'paragraphs_item';
+
+  $builder = new DrupalPatternBuilder($entity_type, $entity);
+  if ($builder->canBuild()) {
+    try {
+      $contents = $builder->render($view_mode);
+      if ($contents) {
+        return array(
+          'build' => array('#markup' => $contents),
+        );
+      }
+    }
+    catch (Exception $e) {
+      watchdog('patternbuilder', 'An error occurred while rendering the @bundle paragraph item (id:@id, revision:@vid) on @host_entity_type (id:@host_id, revision:@host_vid): @error.', array(
+        '@id' => $entity->item_id,
+        '@vid' => $entity->revision_id,
+        '@bundle' => $entity->bundle(),
+        '@host_id' => @$entity->hostEntityId(),
+        '@host_vid' => @$entity->hostEntityRevisionId(),
+        '@host_entity_type' => @$entity->hostEntityType(),
+        '@error' => $e->getMessage(),
+      ), WATCHDOG_ERROR);
+    }
+  }
+}

@@ -1,0 +1,124 @@
+<?php
+
+/**
+ * @file
+ * Patternbuilder install file.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function patternbuilder_schema() {
+  $schema = array();
+  $schema['patternbuilder_components'] = array(
+    'description' => 'Relationship of components to unique ids.',
+    'fields' => array(
+      'id' => array(
+        'description' => 'Unique ID.',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'machine_name' => array(
+        'description' => 'Component machine name.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+      ),
+      'pattern_type' => array(
+        'description' => 'Pattern type.',
+        'type' => 'varchar',
+        'length' => 64,
+        'default' => '',
+        'not null' => TRUE,
+      ),
+      'bundle_name' => array(
+        'description' => 'Entity bundle name.',
+        'type' => 'varchar',
+        'length' => 64,
+        'default' => '',
+        'not null' => FALSE,
+      ),
+      'field_name' => array(
+        'description' => 'Field name representing the schema.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'unique_machine_name' => array('machine_name'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_modules_enabled().
+ */
+function patternbuilder_modules_enabled($modules) {
+  // Determine modules implementing patternbuilder hooks.
+  $implements = array();
+  $reset_hook = TRUE;
+  foreach (patternbuilder_hook_info() as $hook_name => $group) {
+    $hook_implements = module_implements($hook_name, FALSE, $reset_hook);
+    if ($hook_implements) {
+      $implements = array_merge($implements, $hook_implements);
+    }
+  }
+
+  // Clear patternbuilder cache if there are new hook implementations.
+  if ($implements) {
+    $implements = array_unique($implements);
+    $new_implements = array_diff($modules, $implements);
+    if ($new_implements) {
+      patternbuilder_invalidate_cache();
+    }
+  }
+}
+
+/**
+ * Increase machine name field, add bundle and pattern type fields.
+ */
+function patternbuilder_update_7101() {
+  $table = 'patternbuilder_components';
+  $field_updates = array('machine_name', 'bundle_name', 'pattern_type');
+
+  if (!db_table_exists($table)) {
+    drupal_install_schema('patternbuilder');
+  }
+  else {
+    $schema = drupal_get_schema_unprocessed('patternbuilder', $table);
+    foreach ($field_updates as $field) {
+      if (isset($schema['fields'][$field])) {
+        if (db_field_exists($table, $field)) {
+          db_change_field($table, $field, $field, $schema['fields'][$field]);
+        }
+        else {
+          db_add_field($table, $field, $schema['fields'][$field]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Add field_name column.
+ */
+function patternbuilder_update_7102() {
+  $table = 'patternbuilder_components';
+  $field_inserts = array('field_name');
+
+  if (!db_table_exists($table)) {
+    drupal_install_schema('patternbuilder');
+  }
+  else {
+    $schema = drupal_get_schema_unprocessed('patternbuilder', $table);
+    foreach ($field_inserts as $field) {
+      if (isset($schema['fields'][$field]) && !db_field_exists($table, $field)) {
+        db_add_field($table, $field, $schema['fields'][$field]);
+      }
+    }
+  }
+}

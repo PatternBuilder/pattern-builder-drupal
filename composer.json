@@ -1,0 +1,13 @@
+{
+    "name": "Drupal/PatternBuilder",
+    "description": "Provides integration between the PatternBuilder library and Drupal projects",
+    "require": {
+        "pattern-builder/pattern-builder": "0.9.3"
+    },
+    "repositories": [
+      {
+        "type": "vcs",
+        "url": "git@web-dev-gitlab03.devlab.redhat.com:it-marketing/patternbuilder.git"
+      }
+    ]
+}
