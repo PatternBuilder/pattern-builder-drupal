@@ -8,11 +8,12 @@
  */
 
 use PatternBuilder\Property\PropertyInterface;
+use PatternBuilder\Property\PropertyAbstract;
 
 /**
  * Class to contain generic value data without a schema.
  */
-class DrupalPatternBuilderValueProperty implements PropertyInterface {
+class DrupalPatternBuilderValueProperty extends PropertyAbstract implements PropertyInterface {
   protected $data;
 
   /**
@@ -25,7 +26,10 @@ class DrupalPatternBuilderValueProperty implements PropertyInterface {
   /**
    * {@inheritdoc}
    */
-  public function get($name) {
+  public function get($name = NULL) {
+    if (!isset($name)) {
+      return $this->data;
+    }
     return isset($this->data->{$name}) ? $this->data->{$name} : NULL;
   }
 
