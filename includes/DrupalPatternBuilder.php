@@ -84,14 +84,11 @@ class DrupalPatternBuilder {
    *
    * @see http://twig.sensiolabs.org/doc/api.html#basics
    */
-  protected $twigEnvOptions = array();
-
-  /**
-   * Decode special characters before Twig rendering.
-   *
-   * @var boolean
-   */
-  protected $decodeSpecialCharsEnabled = TRUE;
+  protected $twigEnvOptions = array(
+    // Disable TWIG escaping strategy to ensure Drupal input filters control
+    // the rendered markup.
+    'autoescape' => FALSE,
+  );
 
   /**
    * Constructor.
@@ -464,44 +461,12 @@ class DrupalPatternBuilder {
    */
   protected function fieldSetComponent($component, DrupalPatternBuilderDisplayInstance $display) {
     if ($values = $display->view()) {
-      if ($this->decodeSpecialCharsEnabled) {
-        foreach ($values as $delta => $value) {
-          $values[$delta] = static::decodeSpecialChars($value);
-        }
-      }
-
       $property_name = $display->getPbSettings('real_property_name');
       $parent_property_names = $display->getPbSettings('parent_property_names_array');
       foreach ($values as $delta => $value) {
         static::setComponentValue($component, $property_name, $value, $parent_property_names);
       }
     }
-  }
-
-  /**
-   * Decodes special html characters.
-   *
-   * @param array|string $text
-   *   The text to decode.
-   *
-   * @return string
-   *   The decode text if enabled.
-   */
-  protected static function decodeSpecialChars($text) {
-    if (is_array($text)) {
-      $return = array();
-      foreach ($text as $k => $v) {
-        $return[$k] = static::decodeSpecialChars($v);
-      }
-
-      return $return;
-    }
-
-    if (is_string($text)) {
-      return htmlspecialchars_decode($text, ENT_QUOTES);
-    }
-
-    return $text;
   }
 
   /**
