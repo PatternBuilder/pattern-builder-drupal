@@ -540,6 +540,12 @@ class DrupalPatternBuilder {
         $component = $value;
       }
     }
+    elseif (($component instanceof Component)) {
+      // Only set component properties if they exist in the schema.
+      if ($component->schemaPropertyExists($property_name)) {
+        $component->set($property_name, $value);
+      }
+    }
     elseif (method_exists($component, 'set')) {
       $component->set($property_name, $value);
     }
