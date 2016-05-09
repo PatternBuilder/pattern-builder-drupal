@@ -96,6 +96,11 @@ function patternbuilder_modules_enabled($modules) {
  *   The field name to convert.
  * @param string $field_type_new
  *   The new field type.
+ *
+ * @return bool|null
+ *   TRUE if the text field was converted or already converted.
+ *   FALSE if the conversion failed.
+ *   NULL if there was invalid information provided.
  */
 function patternbuilder_convert_text_field($field_name, $field_type_new) {
   $field_original = field_info_field($field_name);
@@ -174,12 +179,13 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
   );
   $field['indexes'] += $field_schema['indexes'];
 
-  // Get the storage schema in case it's differnt than the field schema.
+  // Get the storage schema in case it's different than the field schema.
   $storage_schema = _field_sql_storage_schema($field);
   if (empty($storage_schema)) {
     return FALSE;
   }
 
+  $transaction = NULL;
   $have_transactional_support = Database::getConnection()->supportsTransactionalDDL();
   if ($have_transactional_support) {
     // If the database supports transactional DDL, we can go ahead and rely
@@ -229,8 +235,8 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
     $field_config_primary_key = array('id');
     drupal_write_record('field_config', $field, $field_config_primary_key);
 
-    // Clear caches
-    field_cache_clear(TRUE);
+    // Clear caches.
+    field_cache_clear();
 
     // Invoke external hooks after the cache is cleared for API consistency.
     // See field_update_field().
@@ -332,8 +338,8 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
       }
     }
 
-    // Clear caches
-    field_cache_clear(TRUE);
+    // Clear caches.
+    field_cache_clear();
   }
 
   return $converted;
