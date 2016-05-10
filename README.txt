@@ -5,8 +5,6 @@ library and then import your designs and content data model into Drupal with a
 single drush command. Need to update your design? No problem! Just update and
 QA the code in your pattern library and import those changes in seconds.
 
-# Features
-
 # Installation
 
 * Install as usual, see https://drupal.org/node/895232 for further information.
