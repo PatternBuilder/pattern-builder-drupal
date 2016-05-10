@@ -1181,8 +1181,10 @@ function patternbuilder_field_widget_info() {
 function patternbuilder_field_widget_settings_form($field, $instance) {
   $widget = $instance['widget'];
   $settings = $widget['settings'] + field_info_widget_settings($widget['type']);
+  $form = NULL;
 
   if ($widget['type'] == 'patternbuilder_paragraphs_embed') {
+    $form = array();
     $pattern_type_options = patternbuilder_pattern_types_options_list();
 
     // Limit the list to patterns mapped to bundles.
@@ -1224,6 +1226,7 @@ function patternbuilder_field_widget_form(&$form, &$form_state, $field, $instanc
  * @see paragraphs_field_widget_form_build()
  */
 function patternbuilder_field_widget_form_build(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  module_load_include('inc', 'paragraphs', 'paragraphs.field_widget');
   $element = paragraphs_field_widget_form_build($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
   return $element;
 }

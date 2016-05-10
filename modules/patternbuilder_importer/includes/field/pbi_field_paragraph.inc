@@ -27,17 +27,7 @@ class pbi_field_paragraph extends pbi_field {
    * {@inheritdoc}
    */
   protected function determine_field_widget($property, array $base, array $instance) {
-    $widget = array(
-      'type' => 'patternbuilder_paragraphs_embed',
-    );
-
-    if (module_exists('paragraphs_previewer')) {
-      $widget['settings'] = array(
-        'paragraphs_previewer_enabled' => variable_get('patternbuilder_default_paragraphs_previewer_enabled', 1),
-      );
-    }
-
-    return $widget;
+    return array('type' => 'patternbuilder_paragraphs_embed');
   }
 
   /**

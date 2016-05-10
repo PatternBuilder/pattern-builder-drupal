@@ -642,7 +642,7 @@ class DrupalPatternBuilder {
    * Drupal core issue: https://www.drupal.org/node/2201251
    * This function overcomes this issue by generating fake ids. This reduces
    * the need for a core patch to utilize patternbuilder with the
-   * paragraphs_previewer module.
+   * paragraphs_previewer and patternbuilder_previewer module.
    *
    * @param string $entity_type
    *   The entity type.
