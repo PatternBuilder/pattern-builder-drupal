@@ -43,15 +43,13 @@ QA the code in your pattern library and import those changes in seconds.
 
 ## Setup Walkthrough
 
-Install D7
-`drush en patternbuilder -y`
-`drush en patternbuilder_importer -y`
-
-CD to `sites/all/libraries`
-`git clone git@github.com:PatternBuilder/pattern-builder-lib-php.git patternbuilder`
-
-Create a templates and schemas folder (location is up to you)
-Goto `admin/config/content/patternbuilder` set configuration to point to those folders
+- Install D7
+- `drush en patternbuilder -y`
+- `drush en patternbuilder_importer -y`
+- CD to `sites/all/libraries`
+- `git clone git@github.com:PatternBuilder/pattern-builder-lib-php.git patternbuilder`
+- Create a templates and schemas folder (location is up to you)
+- Goto `admin/config/content/patternbuilder` set configuration to point to those folders
 
 ```
 #schemas/foo.json#
@@ -70,7 +68,9 @@ Goto `admin/config/content/patternbuilder` set configuration to point to those f
 
 {{bar}}
 ```
-- Create content type
+
+- Run pattern builder importer `drush pbi` or `drush pbi foo`
+- Goto/Create content type
 - Manage fields
 - Add new field -> Paragraphs
 - Manage display
