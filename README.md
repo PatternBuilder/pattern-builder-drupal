@@ -48,6 +48,7 @@ QA the code in your pattern library and import those changes in seconds.
 - `drush en patternbuilder_importer -y`
 - CD to `sites/all/libraries`
 - `git clone git@github.com:PatternBuilder/pattern-builder-lib-php.git patternbuilder`
+- `cd patternbuilder && composer install`
 - Create a templates and schemas folder (location is up to you)
 - Goto `admin/config/content/patternbuilder` set configuration to point to those folders
 
