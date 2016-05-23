@@ -951,6 +951,56 @@ function _patternbuilder_field_info_instances($entity_type, $bundle_name) {
 }
 
 /**
+ * Finds the field instance for given property in a given component.
+ *
+ * Only a single bundle level is supported. This does not attempt to chain
+ * into fields that are field collections or paragraphs.
+ *
+ * @param string $component_machine_name
+ *   The machine name of the component schema.
+ * @param string|array $property_names
+ *   The property name or an array of property names representing the
+ *   hierarchical property structure with the last item being the desired
+ *   property name.
+ *
+ * @return array|null
+ *   The field instance info array if found.
+ */
+function patternbuilder_field_info_property_instance($component_machine_name, $property_names) {
+  if (is_string($property_names)) {
+    $property_names = array($property_names);
+  }
+  elseif (!is_array($property_names)) {
+    return NULL;
+  }
+
+  $component = patternbuilder_components_load($component_machine_name);
+  if (empty($component->bundle_name)) {
+    return NULL;
+  }
+
+  $entity_type = 'paragraphs_item';
+  $bundle_name = $component->bundle_name;
+  $instances = _patternbuilder_field_info_instances($entity_type, $bundle_name);
+  if (empty($instances)) {
+    return NULL;
+  }
+
+  // Note: only a single bundle level is supported. This does not attempt to
+  // chain into fields that are field collections or paragraphs.
+  $property_name = array_pop($property_names);
+  $parent_names = $property_names ? implode(PATTERNBUILDER_PROPERTY_DELIMITER, $property_names) : '';
+  foreach ($instances as $field_name => $instance) {
+    $settings = _patternbuilder_field_instance_settings($instance, TRUE);
+    if ($settings['real_property_name'] == $property_name) {
+      if (!$parent_names || $parent_names == $settings['parent_property_names']) {
+        return $instance;
+      }
+    }
+  }
+}
+
+/**
  * Determines if an entity is considered to be a tuple.
  *
  * If there is at least 1 non-tuple item property field then none are returned.
@@ -1181,8 +1231,10 @@ function patternbuilder_field_widget_info() {
 function patternbuilder_field_widget_settings_form($field, $instance) {
   $widget = $instance['widget'];
   $settings = $widget['settings'] + field_info_widget_settings($widget['type']);
+  $form = NULL;
 
   if ($widget['type'] == 'patternbuilder_paragraphs_embed') {
+    $form = array();
     $pattern_type_options = patternbuilder_pattern_types_options_list();
 
     // Limit the list to patterns mapped to bundles.
@@ -1224,6 +1276,7 @@ function patternbuilder_field_widget_form(&$form, &$form_state, $field, $instanc
  * @see paragraphs_field_widget_form_build()
  */
 function patternbuilder_field_widget_form_build(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  module_load_include('inc', 'paragraphs', 'paragraphs.field_widget');
   $element = paragraphs_field_widget_form_build($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
   return $element;
 }
