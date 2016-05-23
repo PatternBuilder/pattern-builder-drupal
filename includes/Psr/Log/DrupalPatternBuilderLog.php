@@ -17,7 +17,7 @@ class DrupalPatternBuilderLog implements LoggerInterface {
    * Class construct.
    */
   public function __construct() {
-    $this->onScreen = variable_get('patternbuilder_devel', FALSE);
+    $this->onScreen = variable_get('patternbuilder_developer_mode_enabled', FALSE);
   }
 
   /**
