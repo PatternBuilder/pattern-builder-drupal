@@ -20,6 +20,13 @@ class DrupalPatternBuilderValueProperty extends PropertyAbstract implements Prop
    * Constructor for the component.
    */
   public function __construct() {
+    $this->initProperties();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function initProperties() {
     $this->data = new \stdClass();
   }
 
