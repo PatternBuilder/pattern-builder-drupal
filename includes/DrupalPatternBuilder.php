@@ -7,6 +7,9 @@
  * File is not namespaced in order to work with D7 class loading.
  */
 
+use PatternBuilder\Property\Component\Component;
+use PatternBuilder\Factory\ComponentFactory;
+
 /**
  * Class to build pattern objects based on entity storage.
  */
@@ -76,6 +79,13 @@ class DrupalPatternBuilder {
    * @var boolean
    */
   protected $isSchemaEntity = FALSE;
+
+  /**
+   * The component factory object.
+   *
+   * @var ComponentFactory
+   */
+  protected $componentFactory;
 
   /**
    * Twig environment options.
@@ -410,6 +420,10 @@ class DrupalPatternBuilder {
                     // support tuples of tuples?
                     $ref_component = array();
                   }
+                  elseif ($prop_component = $this->createPropertyComponent($component, $display->getPbSettings('real_property_name'))) {
+                    // Create from property schema.
+                    $ref_component = $prop_component;
+                  }
                   else {
                     // Fallback to a generic value component.
                     $ref_component = new DrupalPatternBuilderValueProperty();
@@ -499,6 +513,59 @@ class DrupalPatternBuilder {
   protected static function clearFieldViewPreparedFlags($entity) {
     unset($entity->_field_view_prepared);
     unset($entity->_pb_field_views_prepared);
+  }
+
+  /**
+   * Create a new component for the given property.
+   *
+   * @param Component $parent_component
+   *   The parent schema component object.
+   * @param string $property_name
+   *   The name of the property schema for the new component.
+   *
+   * @return \PatternBuilder\Property\PropertyInterface
+   *   The new property component.
+   */
+  protected function createPropertyComponent(Component $parent_component, $property_name) {
+    $schema_path = $parent_component->getSchemaPath();
+    $schema_property = $parent_component->getSchemaProperty($property_name);
+    if ($schema_path && $schema_property) {
+      $factory = $this->getComponentFactory($parent_component);
+      if ($factory) {
+        if (isset($schema_property->items->properties)) {
+          return $factory->create($schema_property->items, $schema_path);
+        }
+        else {
+          return $factory->create($schema_property, $schema_path);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get a component factory from the component else created.
+   *
+   * @param Component|array $component
+   *   The schema component object.
+   */
+  protected function getComponentFactory($component = NULL) {
+    if (is_object($component) && method_exists($component, 'getFactory')) {
+      $factory = $component->getFactory();
+      if ($factory) {
+        return $factory;
+      }
+    }
+
+    if (!isset($this->componentFactory)) {
+      if (isset($this->schemaController)) {
+        $config = $this->schemaController->getConfiguration();
+        if ($config) {
+          $this->componentFactory = new ComponentFactory($config);
+        }
+      }
+    }
+
+    return $this->componentFactory;
   }
 
   /**

@@ -80,7 +80,17 @@ class DrupalPatternBuilderValueProperty extends PropertyAbstract implements Prop
    * {@inheritdoc}
    */
   public function prepareRender() {
-    return $this->data;
+    $values = new \stdClass();
+    foreach ($this->data as $k => $value) {
+      if (is_object($value) && method_exists($value, 'prepareRender')) {
+        $values->{$k} = $value->prepareRender();
+      }
+      else {
+        $values->{$k} = $value;
+      }
+    }
+
+    return $values;
   }
 
 }
