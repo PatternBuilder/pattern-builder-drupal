@@ -43,11 +43,12 @@ QA the code in your pattern library and import those changes in seconds.
 
 ## Setup Walkthrough
 
-- Install D7
+- Make sure [composer is installed](https://getcomposer.org/doc/00-intro.md)
+- [Install D7](https://www.drupal.org/drupal-7.0)
 - `drush en patternbuilder -y`
 - `drush en patternbuilder_importer -y`
 - CD to `sites/all/libraries`
-- `git clone git@github.com:PatternBuilder/pattern-builder-lib-php.git patternbuilder`
+- `git clone https://github.com/PatternBuilder/pattern-builder-lib-php.git patternbuilder`
 - `cd patternbuilder && composer install`
 - Create a templates and schemas folder (location is up to you)
 - Goto `admin/config/content/patternbuilder` set configuration to point to those folders
@@ -76,3 +77,5 @@ QA the code in your pattern library and import those changes in seconds.
 - Add new field -> Paragraphs
 - Manage display
 - Change format to “Patternbuilder rendered item”
+- Create new content type and add `foo` paragraph
+- You'll have a single field `bar` that will be rendered directly through `foo.twig`
