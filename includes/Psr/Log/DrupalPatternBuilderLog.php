@@ -11,13 +11,13 @@ use Psr\Log\LogLevel;
 use Psr\Log\InvalidArgumentException;
 
 class DrupalPatternBuilderLog implements LoggerInterface {
-  protected $onScreen;
+  protected $onScreen = FALSE;
 
   /**
    * Class construct.
    */
   public function __construct() {
-    $this->onScreen = variable_get('patternbuilder_developer_mode_enabled', FALSE);
+    $this->onScreen = variable_get('patternbuilder_developer_mode_enabled', FALSE) && variable_get('patternbuilder_developer_mode_onscreen', FALSE);
   }
 
   /**
