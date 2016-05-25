@@ -12,7 +12,7 @@
  */
 class DrupalPatternBuilder {
   const SCHEMA_ENTITY_TYPE = 'paragraphs_item';
-  const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS = 'DrupalPatternBuilderDisplayInstance';
+  const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT = 'DrupalPatternBuilderDisplayInstance';
   const PB_NATIVE_ENTITY_SCHEMA_NAME = 'pb_entity';
   const PB_NATIVE_RAW_SCHEMA_NAME = 'pb_raw';
 
@@ -250,7 +250,7 @@ class DrupalPatternBuilder {
         }
 
         // Check field values.
-        $field_items = static::field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::fieldGetItems($entity_type, $entity, $field_name);
         if (!empty($field_items)) {
           foreach ($field_items as $field_delta => $field_item) {
             // Assume value key is the first value.
@@ -392,7 +392,7 @@ class DrupalPatternBuilder {
 
       if (isset($entity_wrapper->{$field_name}) && $display->canRender()) {
         $field_display = $display->getDisplay();
-        $field_items = static::field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::fieldGetItems($entity_type, $entity, $field_name);
 
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
@@ -414,7 +414,7 @@ class DrupalPatternBuilder {
                   // Attempt to unwrap the schema.
                   $field_wrapped_schema_instance = patternbuilder_wrapped_schema_field_instance_by_entity($ref_entity_type, $ref_entity);
                   if (!empty($field_wrapped_schema_instance['field_name'])) {
-                    $wrapped_field_items = static::field_get_items($ref_entity_type, $ref_entity, $field_wrapped_schema_instance['field_name']);
+                    $wrapped_field_items = static::fieldGetItems($ref_entity_type, $ref_entity, $field_wrapped_schema_instance['field_name']);
                     if (!empty($wrapped_field_items)) {
                       // There can be only 1 wrapped field item.
                       $wrapped_field_item = reset($wrapped_field_items);
@@ -604,6 +604,39 @@ class DrupalPatternBuilder {
   }
 
   /**
+   * Returns the map of field type to display handler class name.
+   *
+   * @return array
+   *   The map array.
+   */
+  public static function fieldDisplayInstanceHandlerTypeMap() {
+    return array(
+      'list_boolean' => 'DrupalPatternBuilderDisplayInstanceBoolean',
+    );
+  }
+
+  /**
+   * Determines the class name of the display handler.
+   *
+   * @param array $field_instance
+   *   The field instance info.
+   *
+   * @return string
+   *   The display handler class name.
+   */
+  protected static function fieldDisplayInstanceHandlerClass(array $field_instance) {
+    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT;
+    $class_map = static::fieldDisplayInstanceHandlerTypeMap();
+    if ($class_map && isset($field_instance['field_name']) && ($field = field_info_field($field_instance['field_name'])) && !empty($field['type'])) {
+      if (isset($class_map[$field['type']])) {
+        $class_name = $class_map[$field['type']];
+      }
+    }
+
+    return $class_name;
+  }
+
+  /**
    * Creates an instance of the display handler.
    *
    * @param object $entity
@@ -616,12 +649,14 @@ class DrupalPatternBuilder {
    * @param string $langcode
    *   The language the field values are to be shown in.
    *
-   * @return object
+   * @return object|null
    *   An instance of the display handler.
    */
   protected static function createDisplayHandler($entity, array $field_instance, $field_display = 'default', $langcode = NULL) {
-    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS;
-    return new $class_name($entity, $field_instance, $field_display, $langcode);
+    $class_name = static::fieldDisplayInstanceHandlerClass($field_instance);
+    if ($class_name) {
+      return new $class_name($entity, $field_instance, $field_display, $langcode);
+    }
   }
 
   /**
@@ -767,8 +802,8 @@ class DrupalPatternBuilder {
    * @return array
    *   The items array.
    */
-  public static function field_get_items($entity_type, $entity, $field_name, $langcode = NULL) {
-    $langcode = static::field_language($entity_type, $entity, $field_name, $langcode);
+  public static function fieldGetItems($entity_type, $entity, $field_name, $langcode = NULL) {
+    $langcode = static::fieldLanguage($entity_type, $entity, $field_name, $langcode);
     return isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : FALSE;
   }
 
@@ -796,7 +831,7 @@ class DrupalPatternBuilder {
    * @return string
    *   The field language code.
    */
-  public static function field_language($entity_type, $entity, $field_name, $langcode = NULL) {
+  public static function fieldLanguage($entity_type, $entity, $field_name, $langcode = NULL) {
     // Store fake ids for new entities to avoid field_language() cache issue.
     static $drupal_static_fast;
     if (!isset($drupal_static_fast)) {
