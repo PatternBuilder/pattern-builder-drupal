@@ -11,5 +11,6 @@ files[] = includes/PatternBuilder/Property/Component/DrupalPatternBuilderCompone
 files[] = includes/JsonSchema/DrupalPatternBuilderRefResolver.php
 files[] = includes/DrupalPatternBuilder.php
 files[] = includes/DrupalPatternBuilderDisplayInstance.php
+files[] = includes/DrupalPatternBuilderDisplayInstanceBoolean.php
 files[] = includes/PatternBuilder/Property/DrupalPatternBuilderValueProperty.php
 files[] = views/handlers/patternbuilder_views_handler_argument_pattern_type.inc
