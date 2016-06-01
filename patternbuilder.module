@@ -41,7 +41,31 @@ function patternbuilder_menu() {
     'weight' => -100,
   );
 
+  // Paragraph pattern info.
+  $items['admin/structure/paragraphs/%paragraphs_bundle/patternbuilder'] = array(
+    'title' => 'Pattern',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('patternbuilder_admin_bundle_form', 3),
+    'access callback' => 'patternbuilder_admin_bundle_form_access',
+    'access arguments' => array(3),
+    'file' => 'patternbuilder.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    'weight' => 10,
+  );
+
   return $items;
+}
+
+/**
+ * Access callback for patternbuilder_admin_bundle_form.
+ *
+ * @param object $bundle
+ *   The paragraph bundle object.
+ */
+function patternbuilder_admin_bundle_form_access($bundle) {
+  return !empty($bundle->bundle) && user_access('administer paragraphs bundles') &&
+    patternbuilder_get_bundle_component($bundle->bundle);
 }
 
 /**
