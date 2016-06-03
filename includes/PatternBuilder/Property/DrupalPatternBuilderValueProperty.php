@@ -66,52 +66,8 @@ class DrupalPatternBuilderValueProperty extends PropertyAbstract implements Prop
   /**
    * {@inheritdoc}
    */
-  public function render() {
-    $rendered = new \stdClass();
-    foreach ($this->data as $k => $value) {
-      if (is_object($value) && method_exists($value, 'render')) {
-        $rendered->{$k} = $value->render();
-      }
-      else {
-        $rendered->{$k} = $value;
-      }
-    }
-
-    return $rendered;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function prepareRender() {
-    $values = new \stdClass();
-    foreach ($this->data as $k => $value) {
-      if (is_object($value) && method_exists($value, 'prepareRender')) {
-        $values->{$k} = $value->prepareRender();
-      }
-      else {
-        $values->{$k} = $value;
-      }
-    }
-
-    return $values;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function values() {
-    $values = new \stdClass();
-    foreach ($this->data as $k => $value) {
-      if (is_object($value) && method_exists($value, 'values')) {
-        $values->{$k} = $value->values();
-      }
-      else {
-        $values->{$k} = $value;
-      }
-    }
-
-    return $values;
+  public function value() {
+    return $this->data;
   }
 
 }
