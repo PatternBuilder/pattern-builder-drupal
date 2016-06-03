@@ -582,6 +582,9 @@ class DrupalPatternBuilder {
    *
    * @param Component|array $component
    *   The schema component object.
+   *
+   * @return ComponentFactory
+   *   A component factory instance.
    */
   protected function getComponentFactory($component = NULL) {
     if (is_object($component) && method_exists($component, 'getFactory')) {
