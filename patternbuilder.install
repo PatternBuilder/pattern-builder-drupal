@@ -274,7 +274,7 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
           $allowed_formatters[$formatter_name] = array(
             'type' => $formatter_name,
             'settings' => !empty($formatter['settings']) ? $formatter['settings'] : array(),
-          );;
+          );
         }
       }
 

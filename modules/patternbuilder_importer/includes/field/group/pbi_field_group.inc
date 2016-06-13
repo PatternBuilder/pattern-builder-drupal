@@ -310,12 +310,43 @@ class pbi_field_group implements pbi_field_interface, pbi_collapsible_interface 
   protected function create_field_group_stub(array $values) {
     $group_format_type = 'fieldset';
     $group_formatter = 'open';
-    if (isset($values['property']) && $this->is_collapsible($values['property'])) {
-      $group_formatter = $this->collapsible_default_collapsed($values['property']) ? 'collapsed' : 'collapsible';
-    }
+    $group_title = '';
+    $group_description = '';
+    $group_classes = array();
 
     // Set a property name.
     $property_name = isset($values['property_name']) ? $values['property_name'] : '';
+    $group_title = $property_name ? $property_name : $values['group_name'];
+
+    // Process property object.
+    $property = NULL;
+    if (isset($values['property'])) {
+      $property = $values['property'];
+
+      if (isset($property->title)) {
+        $group_title = $property->title;
+      }
+
+      if (isset($property->description)) {
+        $group_description = $property->description;
+      }
+
+      // Collapsible.
+      if ($this->is_collapsible($property)) {
+        $group_formatter = $this->collapsible_default_collapsed($property) ? 'collapsed' : 'collapsible';
+      }
+
+      // Grid layout.
+      $grid_settings = patternbuilder_grid_layout_global_settings();
+      if (!empty($grid_settings['row_class']) && pbi_utility::property_is_grid_format($property)) {
+        $group_classes[] = $grid_settings['row_class'];
+      }
+
+      // Grid columns of child in a grid.
+      if (!empty($grid_settings['col_class_prefix']) && ($grid_columns = pbi_utility::property_grid_columns($property))) {
+        $group_classes[] = $grid_settings['col_class_prefix'] . intval(trim($grid_columns));
+      }
+    }
 
     // Group stub object.
     $group = (object) array(
@@ -324,15 +355,15 @@ class pbi_field_group implements pbi_field_interface, pbi_collapsible_interface 
       'entity_type' => $values['entity_type'],
       'bundle' => $values['bundle'],
       'mode' => 'form',
-      'label' => isset($values['property']->title) ? $values['property']->title : ($property_name ? $property_name : $values['group_name']),
+      'label' => $group_title,
       'children' => array(),
       'weight' => isset($values['weight']) ? $values['weight'] : 0,
       'format_type' => $group_format_type,
       'format_settings' => array(
         'formatter' => $group_formatter,
         'instance_settings' => array(
-          'description' => isset($values['property']->description) ? $values['property']->description : '',
-          'classes' => '',
+          'description' => $group_description,
+          'classes' => $group_classes ? implode(' ', $group_classes) : '',
           'required_fields' => 1,
         ),
       ),

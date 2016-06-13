@@ -80,16 +80,21 @@ class pbi_field_image extends pbi_field_media {
    * {@inheritdoc}
    */
   protected function determine_default_field_formatter($property, array $base, array $instance) {
-    $settings = static::settings_values();
-    $image_style = !empty($settings['image_style']) ? $settings['image_style'] : '';
-    return array(
-      'type' => 'image',
-      'label' => 'hidden',
-      'settings' => array(
-        'image_link' => '',
-        'image_style' => $image_style,
-      ),
-    );
+    $formatter = $this->hook_default_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      $settings = static::settings_values();
+      $image_style = !empty($settings['image_style']) ? $settings['image_style'] : '';
+      $formatter = array(
+        'type' => 'image',
+        'label' => 'hidden',
+        'settings' => array(
+          'image_link' => '',
+          'image_style' => $image_style,
+        ),
+      );
+    }
+
+    return $formatter;
   }
 
 }

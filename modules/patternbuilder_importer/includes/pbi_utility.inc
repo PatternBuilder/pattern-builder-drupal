@@ -10,6 +10,21 @@
 class pbi_utility {
 
   /**
+   * Case-insensitive string comparison with multibyte support.
+   *
+   * @param string $a
+   *   The first string to check.
+   * @param string $b
+   *   The second string to check.
+   *
+   * @return bool
+   *   TRUE if the value is set to "TRUE".
+   */
+  public static function strcasecmp($a, $b) {
+    return drupal_strtolower($a) == drupal_strtolower($b);
+  }
+
+  /**
    * Check if a boolean value is set.
    *
    * @param mixed $value
@@ -264,7 +279,7 @@ class pbi_utility {
    *   TRUE if the property is a text area.
    */
   public static function property_is_textarea($property) {
-    return isset($property->format) && ($property->format == 'textarea' || $property->format == 'html');
+    return isset($property->format) && (static::strcasecmp($property->format, 'textarea') || static::strcasecmp($property->format, 'html'));
   }
 
   /**
@@ -277,7 +292,7 @@ class pbi_utility {
    *   TRUE if the property allows HTML.
    */
   public static function property_allows_html($property) {
-    return isset($property->format) && $property->format == 'html';
+    return isset($property->format) && static::strcasecmp($property->format, 'html');
   }
 
   /**
@@ -348,7 +363,7 @@ class pbi_utility {
         $valid_property_values = array();
         foreach ($resolved_items->items as $property_item) {
           if (isset($property_item->enum) && is_array($property_item->enum)) {
-            if ($resolved_items->validOf == 'allOf') {
+            if (static::strcasecmp($resolved_items->validOf, 'allOf')) {
               if ($valid_property_values) {
                 $valid_property_values = array_intersect($valid_property_values, $property_item->enum);
               }
@@ -364,7 +379,7 @@ class pbi_utility {
         }
 
         if ($valid_property_values) {
-          if ($resolved_items->validOf == 'oneOf') {
+          if (static::strcasecmp($resolved_items->validOf, 'oneOf')) {
             $valid_property_values_counts = array_count_values($valid_property_values);
             $enum_values = array_keys(array_intersect($valid_property_values_counts, array(1)));
           }
@@ -434,6 +449,40 @@ class pbi_utility {
   public static function property_min_items($property) {
     if (isset($property->minItems) && is_numeric($property->minItems) && intval($property->minItems) > 0) {
       return (int) $property->minItems;
+    }
+  }
+
+  /**
+   * Determines if a property is grid formatted.
+   *
+   * @param object $property
+   *   The property object.
+   *
+   * @return bool
+   *   TRUE if the property is grid format.
+   */
+  public static function property_is_grid_format($property) {
+    if (isset($property->format) && static::strcasecmp($property->format, 'grid')) {
+      return TRUE;
+    }
+    return isset($property->items->format) && static::strcasecmp($property->items->format, 'grid');
+  }
+
+  /**
+   * Determines the grid columns for a property.
+   *
+   * @param object $property
+   *   The property object.
+   *
+   * @return int|null
+   *   The grid columns defined.
+   */
+  public static function property_grid_columns($property) {
+    if (isset($property->options->grid_columns) && is_numeric($property->options->grid_columns)) {
+      $number = intval($property->options->grid_columns);
+      if ($number > 0) {
+        return $number;
+      }
     }
   }
 
