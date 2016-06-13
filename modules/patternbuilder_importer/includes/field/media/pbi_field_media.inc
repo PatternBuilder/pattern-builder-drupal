@@ -153,12 +153,16 @@ class pbi_field_media extends pbi_field_entity_abstract {
    * {@inheritdoc}
    */
   protected function determine_default_field_formatter($property, array $base, array $instance) {
-    return array(
-      'type' => 'file_rendered',
-      'settings' => array(
-        'file_view_mode' => 'default',
-      ),
-    );
+    $formatter = $this->hook_default_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      $formatter = array(
+        'type' => 'file_rendered',
+        'settings' => array(
+          'file_view_mode' => 'default',
+        ),
+      );
+    }
+    return $formatter;
   }
 
 }

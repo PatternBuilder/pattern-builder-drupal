@@ -51,11 +51,12 @@ class pbi_field_link extends pbi_field_entity_abstract {
    * {@inheritdoc}
    */
   protected function determine_field_instance_settings($property, array $base, array $instance) {
-    $settings = parent::determine_field_instance_settings($property, $base, $instance);
+    $settings = array();
+    $parent_settings = parent::determine_field_instance_settings($property, $base, $instance);
 
     // Exit if no property map.
     if (empty($property->_pb_property_map)) {
-      return $settings;
+      return $parent_settings;
     }
 
     // Get property values.
@@ -153,7 +154,7 @@ class pbi_field_link extends pbi_field_entity_abstract {
       $settings['attributes']['target'] = $target_setting;
     }
 
-    return $settings;
+    return $settings + $parent_settings;
   }
 
   /**

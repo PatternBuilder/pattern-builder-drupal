@@ -154,6 +154,31 @@ class pbi_field implements pbi_field_interface {
   }
 
   /**
+   * Determine the system default field instance settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   An array of field instance settings.
+   */
+  protected function system_default_field_instance_settings($property, array $base, array $instance) {
+    $default = array();
+
+    if (!empty($base['type']) && ($type_info = field_info_field_types($base['type']))) {
+      if (!empty($type_info['instance_settings'])) {
+        $default = $type_info['instance_settings'];
+      }
+    }
+
+    return $default;
+  }
+
+  /**
    * Determine field instance settings.
    *
    * @param object $property
@@ -181,6 +206,9 @@ class pbi_field implements pbi_field_interface {
       $settings['text_processing'] = 1;
     }
 
+    // Merge with system default settings.
+    $settings += $this->system_default_field_instance_settings($property, $base, $instance);
+
     // Allow others to alter.
     $context = array(
       'base' => $base,
@@ -191,6 +219,66 @@ class pbi_field implements pbi_field_interface {
     drupal_alter('patternbuilder_importer_field_instance_settings', $settings, $context);
 
     return $settings;
+  }
+
+  /**
+   * Determine the system default field formatter settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   A display array for the default field formatter.
+   */
+  protected function system_default_field_formatter($property, array $base, array $instance) {
+    if (empty($base['type'])) {
+      return array();
+    }
+
+    $type = $base['type'];
+    $type_info = field_info_field_types($type);
+
+    $allowed = array();
+    foreach (field_info_formatter_types() as $formatter_name => $formatter) {
+      if (in_array($type, $formatter['field types'], TRUE)) {
+        $allowed[$formatter_name] = array(
+          'type' => $formatter_name,
+          'settings' => !empty($formatter['settings']) ? $formatter['settings'] : array(),
+        );
+      }
+    }
+
+    $default = array();
+    if (!empty($type_info['default_formatter']) && isset($allowed[$type_info['default_formatter']])) {
+      $default = $allowed[$type_info['default_formatter']];
+    }
+    elseif ($allowed) {
+      $default = reset($allowed);
+    }
+
+    return $default;
+  }
+
+  /**
+   * Invoke the Drupal hook to determine the default field formatter settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   A display array for the default field formatter.
+   */
+  protected function hook_default_field_formatter($property, array $base, array $instance) {
+    $formatter = patternbuilder_importer_get_property_default_formatter($property, $base, $instance);
+    return $formatter ? $formatter : array();
   }
 
   /**
@@ -207,8 +295,14 @@ class pbi_field implements pbi_field_interface {
    *   A display array for the default field formatter.
    */
   protected function determine_default_field_formatter($property, array $base, array $instance) {
-    $formatter = patternbuilder_importer_get_property_default_formatter($property, $base, $instance);
-    return $formatter ? $formatter : array();
+    $formatter = $this->hook_default_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      // Explicitly set the default formatter to allow field type changes
+      // that are allowed due to no data stored or due to type conversions.
+      $formatter = $this->system_default_field_formatter($property, $base, $instance);
+    }
+
+    return $formatter;
   }
 
   /**
@@ -311,16 +405,12 @@ class pbi_field implements pbi_field_interface {
    *   The built field instance array.
    *
    * @return array
-   *   The Drupal widget type.
+   *   An array of field widget info.
    */
   protected function determine_field_widget($property, array $base, array $instance) {
     $widget = array();
-    $field_type = $base['type'];
-    switch ($field_type) {
-      case 'list_text':
-        $widget['type'] = 'options_select';
-        break;
 
+    switch ($base['type']) {
       case 'list_boolean':
         $widget['type'] = 'options_onoff';
         $widget['settings'] = array(
@@ -328,32 +418,55 @@ class pbi_field implements pbi_field_interface {
         );
         break;
 
-      case 'list_integer':
-        $widget['type'] = 'options_select';
-        break;
-
-      case 'number_integer':
-        $widget['type'] = 'number';
-        break;
-
-      case 'list_float':
-        $widget['type'] = 'options_select';
-        break;
-
-      case 'number_float':
-        $widget['type'] = 'number';
-        break;
-
-      case 'text':
-        $widget['type'] = 'text_textfield';
-        break;
-
-      case 'text_long':
-        $widget['type'] = 'text_textarea';
+      default:
+        $widget = $this->system_default_field_widget($property, $base, $instance);
         break;
     }
 
     return $widget;
+  }
+
+  /**
+   * Determine the system field widget settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   An array of field widget info.
+   */
+  protected function system_default_field_widget($property, array $base, array $instance) {
+    if (empty($base['type'])) {
+      return array();
+    }
+
+    $type = $base['type'];
+    $type_info = field_info_field_types($type);
+
+    $allowed = array();
+    foreach (field_info_widget_types() as $widget_name => $widget) {
+      if (in_array($type, $widget['field types'], TRUE)) {
+        $allowed[$widget_name] = array(
+          'type' => $widget_name,
+          'active' => 1,
+          'settings' => !empty($widget['settings']) ? $widget['settings'] : array(),
+        );
+      }
+    }
+
+    $default = array();
+    if (!empty($type_info['default_widget']) && isset($allowed[$type_info['default_widget']])) {
+      $default = $allowed[$type_info['default_widget']];
+    }
+    elseif ($allowed) {
+      $default = reset($allowed);
+    }
+
+    return $default;
   }
 
   /**

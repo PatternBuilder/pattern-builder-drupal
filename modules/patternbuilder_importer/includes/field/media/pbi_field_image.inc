@@ -51,7 +51,7 @@ class pbi_field_image extends pbi_field_media {
   protected function determine_default_field_formatter($property, array $base, array $instance) {
     // @todo: set formatter image style?
     // Use the default image formatter for now.
-    return array();
+    return parent::determine_default_field_formatter($property, $base, $instance);
   }
 
 }
