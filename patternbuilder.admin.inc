@@ -59,6 +59,36 @@ function patternbuilder_settings_form($form, &$form_state) {
     '#description' => t('Enter the directories to scan for TWIG template files.'),
   );
 
+  $form['grid'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Grid layout on the Edit Form'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => t('Configure settings for the grid layout on the edit form.'),
+  );
+
+  $grid_settings = patternbuilder_grid_layout_global_settings();
+  $form['grid']['patternbuilder_grid_row_class'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Row class'),
+    '#description' => t('The class for the row container in the grid layout.'),
+    '#default_value' => $grid_settings['row_class'],
+  );
+
+  $form['grid']['patternbuilder_grid_col_class_prefix'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Column class prefix'),
+    '#default_value' => $grid_settings['col_class_prefix'],
+    '#description' => t('The number of columns will be appended to the column class prefix. Examples: !examples', array(
+      '!examples' => theme('item_list', array(
+        'items' => array(
+          '"grid-columns-" results in "grid-columns-4"',
+          '"col col-" results in "col col-4"',
+        ),
+      )),
+    )),
+  );
+
   $form['#validate'][] = 'patternbuilder_settings_form_validate';
   $form = system_settings_form($form);
   $form['#submit'][] = 'patternbuilder_settings_form_submit';

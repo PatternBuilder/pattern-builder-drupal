@@ -792,6 +792,8 @@ function _patternbuilder_field_instance_settings(array $instance, $only_stored =
     'real_property_name' => NULL,
     'parent_property_names_array' => array(),
     'property_map_array' => array(),
+    'grid_format' => FALSE,
+    'grid_columns' => NULL,
   );
 
   $settings = array();
@@ -1117,7 +1119,34 @@ function patternbuilder_form_field_ui_field_edit_form_alter(&$form, &$form_state
       '#title' => t('Read-only on the edit form'),
       '#default_value' => $settings['readonly'],
     );
+
+    $form['instance']['settings']['patternbuilder']['grid_format'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Grid layout on the edit form'),
+      '#default_value' => $settings['grid_format'],
+    );
+    $form['instance']['settings']['patternbuilder']['grid_columns'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Grid columns on the edit form (1 - 12)'),
+      '#description' => t('The grid columns for a child property with a parent property that has a grid format.'),
+      '#default_value' => $settings['grid_columns'],
+      '#size' => 10,
+      '#element_validate' => array('element_validate_integer_positive'),
+    );
   }
+}
+
+/**
+ * Returns global settings for the grid layout on an edit form.
+ *
+ * @return array
+ *   The settings keyed by shorten names,
+ */
+function patternbuilder_grid_layout_global_settings() {
+  return array(
+    'row_class' => variable_get('patternbuilder_grid_row_class', 'row'),
+    'col_class_prefix' => variable_get('patternbuilder_grid_col_class_prefix', 'grid-columns-'),
+  );
 }
 
 /**
@@ -1139,7 +1168,12 @@ function patternbuilder_field_attach_form($entity_type, $entity, &$form, &$form_
   // Alter the field elements.
   $field_instances = field_info_instances($entity_type, $bundle_name);
   foreach ($field_instances as $field_name => $field_instance) {
-    if (!isset($form[$field_name])) {
+    if (!isset($form[$field_name]) || !isset($form[$field_name]['#language'])) {
+      continue;
+    }
+
+    $field_language = $form[$field_name]['#language'];
+    if (!isset($form[$field_name][$field_language])) {
       continue;
     }
 
@@ -1147,6 +1181,10 @@ function patternbuilder_field_attach_form($entity_type, $entity, &$form, &$form_
     if (empty($instance_settings)) {
       continue;
     }
+
+    // Reference elements.
+    $elements = &$form[$field_name][$field_language];
+    $field_info = field_info_field($field_name);
 
     // Determine the field flags.
     $is_required = isset($field_instance['required']) && !empty($field_instance['required']);
@@ -1160,26 +1198,26 @@ function patternbuilder_field_attach_form($entity_type, $entity, &$form, &$form_
     if ($is_readonly || $is_hidden) {
       $can_hide = !$is_required;
       if (!$can_hide) {
-        $field_language = $form[$field_name]['#language'];
-        $on_value = isset($form[$field_name][$field_language]['#on_value']) ? $form[$field_name][$field_language]['#on_value'] : NULL;
+
+        $on_value = isset($elements['#on_value']) ? $elements['#on_value'] : NULL;
         $value_key = NULL;
-        if (isset($form[$field_name][$field_language]['#value_key'])) {
-          $value_key = $form[$field_name][$field_language]['#value_key'];
+        if (isset($elements['#value_key'])) {
+          $value_key = $elements['#value_key'];
         }
-        elseif (!empty($form[$field_name][$field_language][0]['#columns'])) {
-          $value_key = reset($form[$field_name][$field_language][0]['#columns']);
+        elseif (!empty($elements[0]['#columns'])) {
+          $value_key = reset($elements[0]['#columns']);
         }
 
         // Inspect the form array if there are no values on the entity.
-        if (isset($form[$field_name][$field_language]['#default_value'])) {
-          if ((isset($on_value) && $form[$field_name][$field_language]['#default_value'] == $on_value) || $form[$field_name][$field_language]['#default_value'] !== '') {
+        if (isset($elements['#default_value'])) {
+          if ((isset($on_value) && $elements['#default_value'] == $on_value) || $elements['#default_value'] !== '') {
             $can_hide = TRUE;
           }
         }
-        elseif (isset($form[$field_name][$field_language][0])) {
-          foreach (element_children($form[$field_name][$field_language]) as $delta) {
+        elseif (isset($elements[0])) {
+          foreach (element_children($elements) as $delta) {
             if (is_numeric($delta)) {
-              $value_element = isset($form[$field_name][$field_language][$delta][$value_key]) ? $form[$field_name][$field_language][$delta][$value_key] : $form[$field_name][$field_language][$delta];
+              $value_element = isset($elements[$delta][$value_key]) ? $elements[$delta][$value_key] : $elements[$delta];
               if (isset($value_element['#default_value'])) {
                 if ((isset($on_value) && $value_element['#default_value'] == $on_value) || $value_element['#default_value'] !== '') {
                   $can_hide = TRUE;
@@ -1202,6 +1240,25 @@ function patternbuilder_field_attach_form($entity_type, $entity, &$form, &$form_
           $form[$field_name]['#access'] = FALSE;
         }
       }
+    }
+
+    // Grid layout.
+    $grid_settings = patternbuilder_grid_layout_global_settings();
+    if (!empty($instance_settings['grid_format']) && !empty($grid_settings['row_class'])) {
+      if ($field_info['cardinality'] == 1) {
+        $form[$field_name]['#attributes']['class'][] = $grid_settings['row_class'];
+      }
+      else {
+        foreach (element_children($elements) as $delta) {
+          if (is_numeric($delta)) {
+            $elements[$delta]['#attributes']['class'][] = $grid_settings['row_class'];
+          }
+        }
+      }
+    }
+
+    if (!empty($instance_settings['grid_columns']) && !empty($grid_settings['col_class_prefix'])) {
+      $form[$field_name]['#attributes']['class'][] = $grid_settings['col_class_prefix'] . intval(trim($instance_settings['grid_columns']));
     }
   }
 }
