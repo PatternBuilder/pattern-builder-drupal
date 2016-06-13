@@ -173,6 +173,8 @@ class pbi_field implements pbi_field_interface {
         'parent_property_names' => '',
         'readonly' => isset($property->readonly) && pbi_utility::is_boolean_set($property->readonly),
         'hidden' => isset($property->options->hidden) && pbi_utility::is_boolean_set($property->options->hidden),
+        'grid_format' => pbi_utility::property_is_grid_format($property),
+        'grid_columns' => pbi_utility::property_grid_columns($property),
       ),
     );
 
