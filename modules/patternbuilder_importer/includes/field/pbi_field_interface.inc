@@ -18,6 +18,22 @@ interface pbi_field_interface {
   public static function dependencies_met();
 
   /**
+   * Form for global per handler importer settings.
+   *
+   * @return array
+   *   A form array keyed by the handler class name.
+   */
+  public static function settings_form();
+
+  /**
+   * Values for global per handler importer settings.
+   *
+   * @return array
+   *   An array of handler settings.
+   */
+  public static function settings_values();
+
+  /**
    * Returns a Drupal field type that is independent of any property definition.
    *
    * If this is defined then it should always be used as the field type.
