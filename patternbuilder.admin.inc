@@ -130,3 +130,105 @@ function patternbuilder_settings_form_submit($form, &$form_state) {
   // Invalidate all patternbuilder cache for changes to be active.
   patternbuilder_invalidate_cache();
 }
+
+/**
+ * Pattern info for a paragraph bundle.
+ */
+function patternbuilder_admin_bundle_form($form, &$form_state, $bundle = NULL) {
+  $component = patternbuilder_get_bundle_component($bundle->bundle);
+
+  $info_labels = array(
+    'id' => t('Internal ID'),
+    'machine_name' => t('Machine name'),
+    'pattern_type' => t('Type'),
+    'schema_path' => t('JSON schema path'),
+    'template_path' => t('Default template path')
+  );
+
+  $pattern_type_labels = patternbuilder_pattern_types_labels();
+
+  $info_items = array();
+
+  // Stored component mapping info.
+  foreach ($info_labels as $info_key => $info_label) {
+    if (isset($component->{$info_key})) {
+      if ($info_key == 'pattern_type' && !empty($pattern_type_labels[$component->{$info_key}]) && $pattern_type_labels[$component->{$info_key}] != $component->{$info_key}) {
+        $info_value = t('@human_pattern_type_label (@machine_pattern_type_label)', array(
+          '@human_pattern_type_label' => $pattern_type_labels[$component->{$info_key}],
+          '@machine_pattern_type_label' => $component->{$info_key},
+        ));
+      }
+      else {
+        $info_value = check_plain($component->{$info_key});
+      }
+      $info_items[$info_key] = array(
+        '#type' => 'item',
+        '#field_prefix' => $info_label . ':',
+        '#markup' => $info_value,
+      );
+    }
+  }
+
+  // JSON Schema.
+  $schemas = patternbuilder_get_schemas();
+  if (!empty($schemas[$component->machine_name])) {
+    $schema_path = $schemas[$component->machine_name];
+    if (strpos($schema_path, 'file://') === 0) {
+      $schema_path = preg_replace('@^file\:\/\/@', '', $schema_path);
+    }
+    $info_items['schema_path'] = array(
+      '#type' => 'item',
+      '#field_prefix' => $info_labels['schema_path'] . ':',
+      '#markup' => check_plain($schema_path),
+    );
+
+    // Get Twig file name to find.
+    $template_filename = '';
+    $factory = patternbuilder_get();
+    $pattern = $factory->load($component->machine_name);
+    if ($pattern && method_exists($pattern, 'getTheme')) {
+      $template_filename = $pattern->getTheme();
+    }
+    if (empty($template_filename)) {
+      $template_filename = $component->machine_name . '.twig';
+    }
+
+    // Find TWIG template path.
+    $template_paths = patternbuilder_get_template_paths();
+    $twig_loader = new Twig_Loader_Filesystem($template_paths);
+
+    $template_path = '';
+    try {
+      $template_path = $twig_loader->getCacheKey($template_filename);
+    }
+    catch (Twig_Error_Loader $e) {
+    }
+
+    if (empty($template_path)) {
+      $template_path = t('No file found.');
+    }
+    else {
+      $template_path = check_plain($template_path);
+    }
+    $info_items['template_path'] = array(
+      '#type' => 'item',
+      '#field_prefix' => $info_labels['template_path'] . ':',
+      '#markup' => $template_path,
+    );
+  }
+
+  if ($info_items) {
+    $form['pattern_info'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Pattern details'),
+    );
+    $form['pattern_info'] += $info_items;
+  }
+
+  // @todo: Add settings that can be changed / overridden in Drupal.
+  // Pattern status - active, private, deprecated, inactive.
+  // This would need to track status is forced / overridden so that a re-import
+  // did not change it.
+
+  return $form;
+}
