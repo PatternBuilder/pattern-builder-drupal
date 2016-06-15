@@ -131,7 +131,7 @@ class pbi_factory {
    *   An array of handler classes keyed by meta type.
    */
   public static function meta_type_handlers() {
-    $handlers = &drupal_static(__FUNCTION__);
+    $handlers = &drupal_static('pbi_factory.' . __FUNCTION__);
     if (!isset($handlers)) {
       $handlers = array(
         'field' => 'pbi_field',
