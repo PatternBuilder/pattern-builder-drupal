@@ -59,6 +59,32 @@ function patternbuilder_settings_form($form, &$form_state) {
     '#description' => t('Enter the directories to scan for TWIG template files.'),
   );
 
+  $developer_mode_enabled = variable_get('patternbuilder_developer_mode_enabled', FALSE);
+  $form['development'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Development'),
+    '#collapsible' => TRUE,
+    '#collapsed' => !$developer_mode_enabled,
+  );
+
+  $form['development']['patternbuilder_developer_mode_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Developer mode'),
+    '#default_value' => $developer_mode_enabled,
+    '#description' => t('Developer mode enables JSON schema validation when rendering patterns.'),
+  );
+
+  $form['development']['patternbuilder_developer_mode_onscreen'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display logs on the page'),
+    '#default_value' => variable_get('patternbuilder_developer_mode_onscreen', FALSE),
+    '#states' => array(
+      'visible' => array(
+        ':input[name="patternbuilder_developer_mode_enabled"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
   $form['#validate'][] = 'patternbuilder_settings_form_validate';
   $form = system_settings_form($form);
   $form['#submit'][] = 'patternbuilder_settings_form_submit';

@@ -134,10 +134,11 @@ class DrupalPatternBuilderDisplayInstance {
     $this->entityRevisionId = $entity_revision_id;
     $this->entityBundle = $entity_bundle;
 
+    $this->fieldName = $field_instance['field_name'];
     $this->fieldType = $field['type'];
     $this->instance = $field_instance;
     $this->display = $field_display;
-    $this->language = DrupalPatternBuilder::field_language($this->entityType, $this->entity, $this->instance['field_name'], $langcode);
+    $this->language = DrupalPatternBuilder::fieldLanguage($this->entityType, $this->entity, $this->instance['field_name'], $langcode);
 
     $this->prepare();
   }
@@ -354,7 +355,7 @@ class DrupalPatternBuilderDisplayInstance {
     }
 
     $field_name = $this->instance['field_name'];
-    $items = DrupalPatternBuilder::field_get_items($this->entityType, $this->entity, $field_name, $this->language);
+    $items = DrupalPatternBuilder::fieldGetItems($this->entityType, $this->entity, $field_name, $this->language);
     if (empty($items)) {
       return array();
     }

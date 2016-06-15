@@ -7,12 +7,15 @@
  * File is not namespaced in order to work with D7 class loading.
  */
 
+use PatternBuilder\Property\Component\Component;
+use PatternBuilder\Factory\ComponentFactory;
+
 /**
  * Class to build pattern objects based on entity storage.
  */
 class DrupalPatternBuilder {
   const SCHEMA_ENTITY_TYPE = 'paragraphs_item';
-  const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS = 'DrupalPatternBuilderDisplayInstance';
+  const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT = 'DrupalPatternBuilderDisplayInstance';
 
   /**
    * The entity object.
@@ -76,6 +79,13 @@ class DrupalPatternBuilder {
    * @var boolean
    */
   protected $isSchemaEntity = FALSE;
+
+  /**
+   * The component factory object.
+   *
+   * @var ComponentFactory
+   */
+  protected $componentFactory;
 
   /**
    * Twig environment options.
@@ -248,7 +258,7 @@ class DrupalPatternBuilder {
         }
 
         // Check field values.
-        $field_items = static::field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::fieldGetItems($entity_type, $entity, $field_name);
         if (!empty($field_items)) {
           foreach ($field_items as $field_delta => $field_item) {
             // Assume value key is the first value.
@@ -390,7 +400,7 @@ class DrupalPatternBuilder {
 
       if (isset($entity_wrapper->{$field_name}) && $display->canRender()) {
         $field_display = $display->getDisplay();
-        $field_items = static::field_get_items($entity_type, $entity, $field_name);
+        $field_items = static::fieldGetItems($entity_type, $entity, $field_name);
 
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
@@ -409,6 +419,10 @@ class DrupalPatternBuilder {
                     // @todo: Should this be a custom value array component to
                     // support tuples of tuples?
                     $ref_component = array();
+                  }
+                  elseif ($prop_component = $this->createPropertyComponent($component, $display->getPbSettings('real_property_name'))) {
+                    // Create from property schema.
+                    $ref_component = $prop_component;
                   }
                   else {
                     // Fallback to a generic value component.
@@ -470,6 +484,39 @@ class DrupalPatternBuilder {
   }
 
   /**
+   * Returns the map of field type to display handler class name.
+   *
+   * @return array
+   *   The map array.
+   */
+  public static function fieldDisplayInstanceHandlerTypeMap() {
+    return array(
+      'list_boolean' => 'DrupalPatternBuilderDisplayInstanceBoolean',
+    );
+  }
+
+  /**
+   * Determines the class name of the display handler.
+   *
+   * @param array $field_instance
+   *   The field instance info.
+   *
+   * @return string
+   *   The display handler class name.
+   */
+  protected static function fieldDisplayInstanceHandlerClass(array $field_instance) {
+    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT;
+    $class_map = static::fieldDisplayInstanceHandlerTypeMap();
+    if ($class_map && isset($field_instance['field_name']) && ($field = field_info_field($field_instance['field_name'])) && !empty($field['type'])) {
+      if (isset($class_map[$field['type']])) {
+        $class_name = $class_map[$field['type']];
+      }
+    }
+
+    return $class_name;
+  }
+
+  /**
    * Creates an instance of the display handler.
    *
    * @param object $entity
@@ -482,12 +529,14 @@ class DrupalPatternBuilder {
    * @param string $langcode
    *   The language the field values are to be shown in.
    *
-   * @return object
+   * @return object|null
    *   An instance of the display handler.
    */
   protected static function createDisplayHandler($entity, array $field_instance, $field_display = 'default', $langcode = NULL) {
-    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS;
-    return new $class_name($entity, $field_instance, $field_display, $langcode);
+    $class_name = static::fieldDisplayInstanceHandlerClass($field_instance);
+    if ($class_name) {
+      return new $class_name($entity, $field_instance, $field_display, $langcode);
+    }
   }
 
   /**
@@ -499,6 +548,62 @@ class DrupalPatternBuilder {
   protected static function clearFieldViewPreparedFlags($entity) {
     unset($entity->_field_view_prepared);
     unset($entity->_pb_field_views_prepared);
+  }
+
+  /**
+   * Create a new component for the given property.
+   *
+   * @param Component $parent_component
+   *   The parent schema component object.
+   * @param string $property_name
+   *   The name of the property schema for the new component.
+   *
+   * @return \PatternBuilder\Property\PropertyInterface
+   *   The new property component.
+   */
+  protected function createPropertyComponent(Component $parent_component, $property_name) {
+    $schema_path = $parent_component->getSchemaPath();
+    $schema_property = $parent_component->getSchemaProperty($property_name);
+    if ($schema_path && $schema_property) {
+      $factory = $this->getComponentFactory($parent_component);
+      if ($factory) {
+        if (isset($schema_property->items->properties)) {
+          return $factory->create($schema_property->items, $schema_path);
+        }
+        else {
+          return $factory->create($schema_property, $schema_path);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get a component factory from the component else created.
+   *
+   * @param Component|array $component
+   *   The schema component object.
+   *
+   * @return ComponentFactory
+   *   A component factory instance.
+   */
+  protected function getComponentFactory($component = NULL) {
+    if (is_object($component) && method_exists($component, 'getFactory')) {
+      $factory = $component->getFactory();
+      if ($factory) {
+        return $factory;
+      }
+    }
+
+    if (!isset($this->componentFactory)) {
+      if (isset($this->schemaController)) {
+        $config = $this->schemaController->getConfiguration();
+        if ($config) {
+          $this->componentFactory = new ComponentFactory($config);
+        }
+      }
+    }
+
+    return $this->componentFactory;
   }
 
   /**
@@ -633,8 +738,8 @@ class DrupalPatternBuilder {
    * @return array
    *   The items array.
    */
-  public static function field_get_items($entity_type, $entity, $field_name, $langcode = NULL) {
-    $langcode = static::field_language($entity_type, $entity, $field_name, $langcode);
+  public static function fieldGetItems($entity_type, $entity, $field_name, $langcode = NULL) {
+    $langcode = static::fieldLanguage($entity_type, $entity, $field_name, $langcode);
     return isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : FALSE;
   }
 
@@ -662,7 +767,7 @@ class DrupalPatternBuilder {
    * @return string
    *   The field language code.
    */
-  public static function field_language($entity_type, $entity, $field_name, $langcode = NULL) {
+  public static function fieldLanguage($entity_type, $entity, $field_name, $langcode = NULL) {
     // Store fake ids for new entities to avoid field_language() cache issue.
     static $drupal_static_fast;
     if (!isset($drupal_static_fast)) {

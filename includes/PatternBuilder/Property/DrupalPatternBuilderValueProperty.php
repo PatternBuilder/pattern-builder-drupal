@@ -12,6 +12,10 @@ use PatternBuilder\Property\PropertyAbstract;
 
 /**
  * Class to contain generic value data without a schema.
+ *
+ * TODO: Determine if this is needed anymore.
+ * The DrupalPatternBuilder::createPropertyComponent() creates property objects
+ * on the fly now, so the builder might not even fallback to this anymore.
  */
 class DrupalPatternBuilderValueProperty extends PropertyAbstract implements PropertyInterface {
   protected $data;
@@ -20,6 +24,13 @@ class DrupalPatternBuilderValueProperty extends PropertyAbstract implements Prop
    * Constructor for the component.
    */
   public function __construct() {
+    $this->initProperties();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function initProperties() {
     $this->data = new \stdClass();
   }
 
@@ -55,24 +66,7 @@ class DrupalPatternBuilderValueProperty extends PropertyAbstract implements Prop
   /**
    * {@inheritdoc}
    */
-  public function render() {
-    $rendered = new \stdClass();
-    foreach ($this->data as $k => $value) {
-      if (is_object($value) && method_exists($value, 'render')) {
-        $rendered->{$k} = $value->render();
-      }
-      else {
-        $rendered->{$k} = $value;
-      }
-    }
-
-    return $rendered;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function prepareRender() {
+  public function value() {
     return $this->data;
   }
 
