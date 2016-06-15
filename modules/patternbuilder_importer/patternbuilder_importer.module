@@ -20,6 +20,41 @@ function patternbuilder_importer_hook_info() {
 }
 
 /**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Implemented for patternbuilder_settings_form.
+ */
+function patternbuilder_importer_form_patternbuilder_settings_form_alter(&$form, &$form_state, $form_id) {
+  $handler_forms = array();
+  $factory_class = patternbuilder_importer_default_factory_class_name();
+  if (class_exists($factory_class)) {
+    // Import handler settings.
+    $handlers = $factory_class::meta_type_handlers();
+    if ($handlers) {
+      foreach ($handlers as $handler_meta_type => $handler_class) {
+        if (class_exists($handler_class)) {
+          $handler_form = $handler_class::settings_form();
+          if ($handler_form) {
+            $handler_forms += $handler_form;
+          }
+        }
+      }
+    }
+
+    if ($handler_forms) {
+      $form['patternbuilder_importer_handlers'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Pattern Builder Importer: Field Handlers'),
+        '#description' => t('Configure the field importers.'),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+      );
+      $form['patternbuilder_importer_handlers'] += $handler_forms;
+    }
+  }
+}
+
+/**
  * Print a message during import.
  *
  * @param string $message

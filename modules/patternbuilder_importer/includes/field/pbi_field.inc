@@ -46,6 +46,59 @@ class pbi_field implements pbi_field_interface {
   /**
    * {@inheritdoc}
    */
+  public static function settings_form() {
+    return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_values() {
+    $defaults = static::settings_defaults();
+    if (!$defaults) {
+      $defaults = array();
+    }
+
+    $stored = static::settings_stored();
+    return $stored ? $stored + $defaults : $defaults;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_defaults() {
+    return array();
+  }
+
+  /**
+   * Retrieve the settings storage id.
+   *
+   * @return string
+   *   The storage id.
+   */
+  public static function settings_storage_id() {
+    return 'pbi_handler_' . get_called_class();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_stored() {
+    $id = static::settings_storage_id();
+    $stored = $id ? variable_get($id, array()) : array();
+
+    $classname = get_called_class();
+    $parent_classname = get_parent_class($classname);
+    if (method_exists($parent_classname, 'settings_stored')) {
+      $stored += $parent_classname::settings_stored();
+    }
+
+    return $stored;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function save($name, $property, array $required_properties, &$weight) {
     $weight++;
     if ($field = $this->preprocess_field($name, $property, $required_properties, $weight)) {

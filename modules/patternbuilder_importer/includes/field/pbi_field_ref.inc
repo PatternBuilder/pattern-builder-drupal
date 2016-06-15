@@ -21,7 +21,7 @@ class pbi_field_ref extends pbi_field implements pbi_ref_interface {
   /**
    * {@inheritdoc}
    */
-  protected function preprocess_field($name, $property, $required_properties, $weight) {
+  protected function preprocess_field($name, $property, array $required_properties, $weight) {
     $instance = $this->find_reference_field_instance($property);
     if (empty($instance['field_name'])) {
       // Fail-safe: The existence of the reference should be checked first.

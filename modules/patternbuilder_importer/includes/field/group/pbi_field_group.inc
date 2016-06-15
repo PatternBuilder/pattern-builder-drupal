@@ -45,6 +45,20 @@ class pbi_field_group implements pbi_field_interface, pbi_collapsible_interface 
   /**
    * {@inheritdoc}
    */
+  public static function settings_form() {
+    return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_values() {
+    return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public static function global_field_type() {
     return NULL;
   }

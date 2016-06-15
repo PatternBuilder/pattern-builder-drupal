@@ -19,6 +19,67 @@ class pbi_field_media extends pbi_field_entity_abstract {
   /**
    * {@inheritdoc}
    */
+  public static function settings_defaults() {
+    $defaults = array(
+      'allowed_file_schemes' => array(),
+      'browser_plugins' => array(),
+    );
+    $defaults += parent::settings_defaults();
+    return $defaults;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_form() {
+    $form = parent::settings_form();
+    $storage_id = static::settings_storage_id();
+    $settings = static::settings_values();
+
+    $visible_steam_wrappers = file_get_stream_wrappers(STREAM_WRAPPERS_VISIBLE);
+    $scheme_options = array();
+    foreach ($visible_steam_wrappers as $scheme => $scheme_info) {
+      $scheme_options[$scheme] = check_plain($scheme_info['name']);
+    }
+
+    $classname = get_called_class();
+    $form[$storage_id] = array(
+      '#type' => 'fieldset',
+      '#title' => $classname,
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#tree' => TRUE,
+    );
+
+    $form[$storage_id]['allowed_file_schemes'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Allowed URI schemes'),
+      '#options' => $scheme_options,
+      '#default_value' => $settings['allowed_file_schemes'],
+      '#description' => t('URI schemes which are allowed for this field. If no schemes are selected, they will all be available.'),
+    );
+
+    // Browser plugin.
+    $browser_plugins = media_get_browser_plugin_info();
+    $browser_plugin_options = array();
+    foreach ($browser_plugins as $browser_plugin_name => $browser_plugin) {
+      $browser_plugin_options[$browser_plugin_name] = check_plain($browser_plugin['title']);
+    }
+
+    $form[$storage_id]['browser_plugins'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Enabled browser plugins'),
+      '#options' => $browser_plugin_options,
+      '#default_value' => $settings['browser_plugins'],
+      '#description' => t('Media browser plugins which are allowed for this field. If no plugins are selected, they will all be available.'),
+    );
+
+    return $form;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public static function global_field_type() {
     return 'file';
   }
@@ -99,6 +160,11 @@ class pbi_field_media extends pbi_field_entity_abstract {
    *   An array of allowed file scheme machine names.
    */
   protected function media_allowed_file_schemes($property, array $base, array $instance) {
+    $settings = static::settings_values();
+    if (!empty($settings['allowed_file_schemes'])) {
+      return array_filter($settings['allowed_file_schemes']);
+    }
+
     return array(variable_get('file_default_scheme', 'public'));
   }
 
@@ -116,6 +182,11 @@ class pbi_field_media extends pbi_field_entity_abstract {
    *   An array of allowed media browser plugin machine names.
    */
   protected function media_allowed_browser_plugins($property, array $base, array $instance) {
+    $settings = static::settings_values();
+    if (!empty($settings['browser_plugins'])) {
+      return array_filter($settings['browser_plugins']);
+    }
+
     // Allow all by default.
     return array();
   }
@@ -134,7 +205,8 @@ class pbi_field_media extends pbi_field_entity_abstract {
     // Create unique associative arrays.
     foreach ($allowed as $allowed_key => $allowed_values) {
       if (!empty($allowed[$allowed_key])) {
-        $allowed[$allowed_key] = array_combine($allowed_values, $allowed_values);
+        $allowed_unique = array_unique(array_filter($allowed_values));
+        $allowed[$allowed_key] = array_combine($allowed_unique, $allowed_unique);
       }
     }
 
