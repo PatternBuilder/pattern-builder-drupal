@@ -604,6 +604,14 @@ function patternbuilder_components_load($machine_name = NULL, $rebuild = FALSE) 
       ->fetchAllAssoc('machine_name');
 
     if ($records) {
+      // Set default status.
+      $default_status = patternbuilder_pattern_status_default();
+      $default_status_name = isset($default_status['name']) ? $default_status['name'] : NULL;
+      foreach ($records as $k => $record) {
+        if (empty($record->status)) {
+          $record->status = $default_status_name;
+        }
+      }
       $cache = $records;
     }
   }
