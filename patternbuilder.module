@@ -840,6 +840,7 @@ function patternbuilder_pattern_statuses($conditions = array(), $rebuild = FALSE
           // Set defaults.
           $statuses[$name] += array(
             'name' => $name,
+            'label' => $name,
             'weight' => 0,
             'import' => TRUE,
             'visible' => TRUE,

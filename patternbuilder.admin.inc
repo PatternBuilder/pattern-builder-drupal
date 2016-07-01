@@ -109,6 +109,38 @@ function patternbuilder_settings_form($form, &$form_state) {
     '#options' => $status_options,
   );
 
+  $statuses_headers = array(
+    t('Label'), t('Module'), t('Imported'), t('Visible'), t('Creatable'),
+  );
+  $statuses_rows = array();
+  $statuses = patternbuilder_pattern_statuses();
+  $status_booleans = array('import', 'visible', 'creatable');
+  foreach ($statuses as $status_key => $status) {
+    $status_row = array();
+    $status_row[] = t('@label (@name)', array(
+      '@label' => $status['label'],
+      '@name' => $status_key,
+    ));
+    $status_row[] = check_plain($status['module']);
+
+    foreach ($status_booleans as $status_boolean_key) {
+      $status_row[] = !empty($status[$status_boolean_key]) ? t('Yes') : t('No');
+    }
+
+    $statuses_rows[] = $status_row;
+  }
+
+  if ($statuses_rows) {
+    $form['pattern_status']['patternbuilder_pattern_statuses'] = array(
+      '#type' => 'item',
+      '#title' => t('Available Pattern Statuses'),
+      '#markup' => theme('table', array(
+        'header' => $statuses_headers,
+        'rows' => $statuses_rows,
+      )),
+    );
+  }
+
   $form['#validate'][] = 'patternbuilder_settings_form_validate';
   $form = system_settings_form($form);
   $form['#submit'][] = 'patternbuilder_settings_form_submit';
