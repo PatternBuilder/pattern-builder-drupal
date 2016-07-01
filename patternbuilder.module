@@ -952,7 +952,7 @@ function patternbuilder_pattern_status_load($name) {
  *
  * @param string $name
  *   Optional parameter specifying the name of the pattern status whose title
- *     to return.
+ *   to return.
  *
  * @return array|null
  *   Either an array of all pattern status titles keyed by the name or a
