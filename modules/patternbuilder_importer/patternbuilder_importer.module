@@ -474,7 +474,17 @@ function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $
   if ($saved_status == SAVED_NEW || $saved_status == SAVED_UPDATED) {
     if (!empty($bundle->bundle)) {
       // Save component mapping - insert or update.
-      patternbuilder_component_save($machine_name, $pattern_type_name, $bundle->bundle);
+      $component_fields = array(
+        'machine_name' => $machine_name,
+        'pattern_type' => $pattern_type_name,
+        'bundle_name' => $bundle->bundle,
+      );
+
+      // Set status.
+      if (!empty($schema->status)) {
+        $component_fields['status'] = $schema->status;
+      }
+      patternbuilder_component_save($component_fields);
     }
 
     return $bundle;
@@ -482,7 +492,7 @@ function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $
 }
 
 /**
- * Creates the paragraphs bundle or updates existing.
+ * Creates the pattern field component.
  *
  * @param string $schema
  *   The schema object.
@@ -500,20 +510,33 @@ function patternbuilder_importer_create_field($schema, $machine_name, $label, $p
   // Custom prefix to avoid collisions with the fields created in the field UI.
   $field_prefix = 'pbi';
 
+  // Get existing component.
+  $component = patternbuilder_components_load($machine_name);
+  $is_new = FALSE;
+
+  if (empty($component->id)) {
+    $component = new stdClass();
+    $component->machine_name = $machine_name;
+  }
+
   // Set default pattern type.
   if (empty($pattern_type_name)) {
     $pattern_type_name = patternbuilder_default_pattern_type();
   }
+  $component->pattern_type = $pattern_type_name;
 
-  // Get existing component.
-  $component = patternbuilder_components_load($machine_name);
-
-  // Create / update component.
   if (empty($component->field_name)) {
     // Create a new field name: [prefix]_[name].
-    $field_name = pbi_utility::create_unique_name($field_prefix, $machine_name);
-    patternbuilder_component_save($machine_name, $pattern_type_name, NULL, $field_name);
+    $component->field_name = pbi_utility::create_unique_name($field_prefix, $machine_name);
   }
+
+  // Set status.
+  if (!empty($schema->status)) {
+    $component->status = $schema->status;
+  }
+
+  // Save the component.
+  patternbuilder_component_save($component);
 
   return !empty($component->field_name) ? $component : NULL;
 }

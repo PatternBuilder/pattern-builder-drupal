@@ -31,6 +31,12 @@ function patternbuilder_schema() {
         'default' => '',
         'not null' => TRUE,
       ),
+      'status' => array(
+        'description' => 'The status name of this pattern.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => FALSE,
+      ),
       'bundle_name' => array(
         'description' => 'Entity bundle name.',
         'type' => 'varchar',
@@ -376,6 +382,26 @@ function patternbuilder_update_7101() {
 function patternbuilder_update_7102() {
   $table = 'patternbuilder_components';
   $field_inserts = array('field_name');
+
+  if (!db_table_exists($table)) {
+    drupal_install_schema('patternbuilder');
+  }
+  else {
+    $schema = drupal_get_schema_unprocessed('patternbuilder', $table);
+    foreach ($field_inserts as $field) {
+      if (isset($schema['fields'][$field]) && !db_field_exists($table, $field)) {
+        db_add_field($table, $field, $schema['fields'][$field]);
+      }
+    }
+  }
+}
+
+/**
+ * Add status column.
+ */
+function patternbuilder_update_7103() {
+  $table = 'patternbuilder_components';
+  $field_inserts = array('status');
 
   if (!db_table_exists($table)) {
     drupal_install_schema('patternbuilder');

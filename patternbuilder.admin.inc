@@ -101,45 +101,30 @@ function patternbuilder_settings_form($form, &$form_state) {
   $status_options = patternbuilder_pattern_status_options_list();
   $default_status = patternbuilder_pattern_status_default();
   $default_status_key = isset($default_status['name']) ? $default_status['name'] : NULL;
+
+  $form['pattern_status']['patternbuilder_pattern_status_ui_access'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow status to be updated via the UI'),
+    '#description' => t('If enabled then the pattern status can be updated on the paragraphs Pattern page ("admin/structure/paragraphs/example-pattern/patternbuilder").'),
+    '#default_value' => variable_get('patternbuilder_pattern_status_ui_access', TRUE),
+  );
+
   $form['pattern_status']['patternbuilder_pattern_status_default'] = array(
     '#type' => 'select',
     '#title' => t('Default pattern status'),
-    '#description' => t('The default pattern status is used if the JSON schema does not specify a "status" property.'),
+    '#description' => t('The default pattern status is used when creating new patterns that do not have a defined status. Refer to the table below for information on the available statuses.'),
     '#default_value' => $default_status_key,
     '#options' => $status_options,
   );
 
-  $statuses_headers = array(
-    t('Label'), t('Module'), t('Imported'), t('Visible'), t('Creatable'),
+  // Display all available statuses.
+  $form['pattern_status']['patternbuilder_pattern_statuses'] = array(
+    '#type' => 'item',
+    '#title' => t('Available Pattern Statuses'),
+    '#markup' => theme('patternbuilder_pattern_statuses', array(
+      'statuses' => patternbuilder_pattern_statuses(),
+    )),
   );
-  $statuses_rows = array();
-  $statuses = patternbuilder_pattern_statuses();
-  $status_booleans = array('import', 'visible', 'creatable');
-  foreach ($statuses as $status_key => $status) {
-    $status_row = array();
-    $status_row[] = t('@label (@name)', array(
-      '@label' => $status['label'],
-      '@name' => $status_key,
-    ));
-    $status_row[] = check_plain($status['module']);
-
-    foreach ($status_booleans as $status_boolean_key) {
-      $status_row[] = !empty($status[$status_boolean_key]) ? t('Yes') : t('No');
-    }
-
-    $statuses_rows[] = $status_row;
-  }
-
-  if ($statuses_rows) {
-    $form['pattern_status']['patternbuilder_pattern_statuses'] = array(
-      '#type' => 'item',
-      '#title' => t('Available Pattern Statuses'),
-      '#markup' => theme('table', array(
-        'header' => $statuses_headers,
-        'rows' => $statuses_rows,
-      )),
-    );
-  }
 
   $form['#validate'][] = 'patternbuilder_settings_form_validate';
   $form = system_settings_form($form);
@@ -184,10 +169,14 @@ function patternbuilder_settings_form_submit($form, &$form_state) {
 }
 
 /**
- * Pattern info for a paragraph bundle.
+ * Pattern form of a paragraph bundle.
  */
 function patternbuilder_admin_bundle_form($form, &$form_state, $bundle = NULL) {
+  // Ensure this include file is loaded when the form is rebuilt from the cache.
+  $form_state['build_info']['files']['form'] = drupal_get_path('module', 'patternbuilder') . '/patternbuilder.admin.inc';
+
   $component = patternbuilder_get_bundle_component($bundle->bundle);
+  $form_state['patternbuilder_component'] = $component;
 
   $info_labels = array(
     'id' => t('Internal ID'),
@@ -277,10 +266,62 @@ function patternbuilder_admin_bundle_form($form, &$form_state, $bundle = NULL) {
     $form['pattern_info'] += $info_items;
   }
 
-  // @todo: Add settings that can be changed / overridden in Drupal.
-  // Pattern status - active, private, deprecated, inactive.
-  // This would need to track status is forced / overridden so that a re-import
-  // did not change it.
+  // Pattern status.
+  $form['status_wrapper'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Pattern Status'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => t('Configure the pattern status.'),
+  );
+
+  $ui_access = array(
+    'status' => variable_get('patternbuilder_pattern_status_ui_access', TRUE),
+  );
+
+  $status_options = patternbuilder_pattern_status_options_list();
+  $default_status = patternbuilder_pattern_status_default();
+  $default_status_key = isset($default_status['name']) ? $default_status['name'] : NULL;
+  $form['status_wrapper']['status'] = array(
+    '#type' => 'select',
+    '#title' => t('Pattern status'),
+    '#description' => t('Refer to the table below for information on the available statuses.'),
+    '#default_value' => isset($component->status) ? $component->status : $default_status_key,
+    '#options' => $status_options,
+    '#disabled' => !$ui_access['status'],
+  );
+
+  $form['status_wrapper']['patternbuilder_pattern_statuses'] = array(
+    '#type' => 'item',
+    '#title' => t('Available Pattern Statuses'),
+    '#markup' => theme('patternbuilder_pattern_statuses', array(
+      'statuses' => patternbuilder_pattern_statuses(),
+    )),
+  );
+
+  // Form actions.
+  if (array_filter($ui_access)) {
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save pattern'),
+      '#weight' => 50,
+    );
+  }
 
   return $form;
+}
+
+/**
+ * Submit handler for the pattern form of a paragraph bundle.
+ */
+function patternbuilder_admin_bundle_form_submit($form, &$form_state, $bundle = NULL) {
+  // Update the component if the status is set.
+  if (!empty($form_state['values']['status']) && !empty($form_state['patternbuilder_component'])) {
+    $form_state['patternbuilder_component']->status = $form_state['values']['status'];
+    patternbuilder_component_save($form_state['patternbuilder_component']);
+    drupal_set_message(t('The pattern has been updated.'));
+  }
+  else {
+    drupal_set_message(t('There were no changes to the pattern.'));
+  }
 }

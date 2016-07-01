@@ -758,46 +758,77 @@ function patternbuilder_get_field_component($field_name) {
 /**
  * Adds a unique machine name to the component table.
  *
- * @param string $machine_name
- *   The pattern machine name.
- * @param string $pattern_type_name
- *   The pattern type name.
- * @param string $bundle_name
- *   The entity bundle machine name.
- * @param string $field_name
- *   The field name.
+ * @param array|object $component
+ *   The component object or array with the following values:
+ *   - machine_name: The machine name to create or update.
+ *   - pattern_type: The pattern type machine name.
+ *   - bundle_name: The paragraph bundle name.
+ *   - field_name: The field name (if a non bundle component).
+ *   - status: The pattern status name.
  *
- * @return object
- *   The fully loaded saved component object.
+ * @return object|null
+ *   The fully loaded saved component object. NULL is returned if the component
+ *   cannot be saved.
  *
  * @throws \Exception
  *   General error.
  */
-function patternbuilder_component_save($machine_name, $pattern_type_name = '', $bundle_name = NULL, $field_name = NULL) {
-  if (empty($pattern_type_name)) {
-    $pattern_type_name = patternbuilder_default_pattern_type();
+function patternbuilder_component_save(&$component) {
+  $record = (array) $component;
+
+  if (empty($record['machine_name'])) {
+    return NULL;
   }
 
-  if (empty($bundle_name)) {
-    $bundle_name = NULL;
+  $current_component = patternbuilder_components_load($record['machine_name']);
+
+  if (empty($record['pattern_type'])) {
+    $record['pattern_type'] = patternbuilder_default_pattern_type();
   }
 
-  if (empty($field_name)) {
-    $field_name = NULL;
+  if (empty($record['bundle_name'])) {
+    $record['bundle_name'] = NULL;
   }
 
+  if (empty($record['field_name'])) {
+    $record['field_name'] = NULL;
+  }
+
+  if (empty($record['status']) && empty($current_component)) {
+    $default_status = patternbuilder_pattern_status_default();
+    $default_status_key = isset($default_status['name']) ? $default_status['name'] : NULL;
+    $record['status'] = $default_status_key;
+  }
+
+  // Ensure only allowed fields to update.
+  $record = array_intersect_key($record, array(
+    'machine_name' => 1,
+    'pattern_type' => 1,
+    'status' => 1,
+    'bundle_name' => 1,
+    'field_name' => 1,
+  ));
+
+  // Update record.
   db_merge('patternbuilder_components')
-    ->key(array('machine_name' => $machine_name))
-    ->fields(array(
-      'machine_name' => $machine_name,
-      'pattern_type' => $pattern_type_name,
-      'bundle_name' => $bundle_name,
-      'field_name' => $field_name,
-    ))
+    ->key(array('machine_name' => $record['machine_name']))
+    ->fields($record)
     ->execute();
 
   // Rebuild load cache and return the component.
-  return patternbuilder_components_load($machine_name, TRUE);
+  $updated_component = patternbuilder_components_load($record['machine_name'], TRUE);
+
+  // Update referenced component.
+  if (is_object($component)) {
+    foreach ($updated_component as $property => $property_value) {
+      $component->{$property} = $property_value;
+    }
+  }
+  elseif (is_array($component)) {
+    $component[$property] = $property_value;
+  }
+
+  return $updated_component;
 }
 
 
@@ -1608,6 +1639,11 @@ function patternbuilder_theme() {
     'patternbuilder_item' => array(
       'render element' => 'elements',
       'template' => 'patternbuilder-item',
+      'path' => $module_path . '/theme',
+      'file' => 'theme.inc',
+    ),
+    'patternbuilder_pattern_statuses' => array(
+      'variables' => array('statuses' => NULL),
       'path' => $module_path . '/theme',
       'file' => 'theme.inc',
     ),
