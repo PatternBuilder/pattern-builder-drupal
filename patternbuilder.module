@@ -21,6 +21,8 @@ function patternbuilder_hook_info() {
   return array(
     'patternbuilder_pattern_types' => $base_info,
     'patternbuilder_pattern_types_alter' => $base_info,
+    'patternbuilder_pattern_status_info' => $base_info,
+    'patternbuilder_pattern_status_info_alter' => $base_info,
   );
 }
 
@@ -116,6 +118,8 @@ function patternbuilder_invalidate_cache() {
 
   drupal_static_reset('patternbuilder_get_pattern_types');
   cache_clear_all('patternbuilder_drupal:pattern_types', 'cache');
+
+  patternbuilder_pattern_statuses_reset();
 
   drupal_static_reset('patternbuilder_components_load');
 
@@ -448,6 +452,7 @@ function patternbuilder_get_pattern_types($pattern_type_name = NULL, $rebuild = 
       if ($rebuild) {
         // Rebuild module hook cache.
         module_implements('patternbuilder_pattern_types', FALSE, TRUE);
+        module_implements('patternbuilder_pattern_types_alter', FALSE, TRUE);
       }
 
       // Build pattern type cache.
@@ -793,6 +798,172 @@ function patternbuilder_component_save($machine_name, $pattern_type_name = '', $
 
   // Rebuild load cache and return the component.
   return patternbuilder_components_load($machine_name, TRUE);
+}
+
+
+/**
+ * Returns an array of some or all of the order statuses keyed by name.
+ *
+ * @param array $conditions
+ *   An array of conditions to filter the returned list by; for example, if you
+ *   specify 'import' => TRUE in the array, then only statuses that can be
+ *   imported will be returned.
+ * @param bool $rebuild
+ *   TRUE to rebuild the cache.
+ *
+ * @return array
+ *   The array of status info, keyed by status name.
+ */
+function patternbuilder_pattern_statuses($conditions = array(), $rebuild = FALSE) {
+  $statuses = &drupal_static(__FUNCTION__);
+
+  if (!isset($statuses) || $rebuild) {
+    $cid = 'patternbuilder_drupal:pattern_status_info';
+    if (!$rebuild && ($cache = cache_get($cid))) {
+      $statuses = $cache->data;
+    }
+    else {
+      // Build via module hooks.
+      if ($rebuild) {
+        // Rebuild module hook cache.
+        module_implements('patternbuilder_pattern_status_info', FALSE, TRUE);
+        module_implements('patternbuilder_pattern_status_info_alter', FALSE, TRUE);
+      }
+
+      // Process each module.
+      $statuses = array();
+      foreach (module_implements('patternbuilder_pattern_status_info') as $module) {
+        foreach (module_invoke($module, 'patternbuilder_pattern_status_info') as $name => $status) {
+          $statuses[$name] = $status;
+          $statuses[$name]['module'] = $module;
+
+          // Set defaults.
+          $statuses[$name] += array(
+            'name' => $name,
+            'weight' => 0,
+            'import' => TRUE,
+            'visible' => TRUE,
+            'creatable' => TRUE,
+          );
+        }
+      }
+    }
+
+    // Give other modules a chance to alter the order statuses.
+    drupal_alter('patternbuilder_pattern_status_info', $statuses);
+
+    uasort($statuses, 'drupal_sort_weight');
+    cache_set($cid, $statuses);
+  }
+
+  // Apply conditions to the returned statuses if specified.
+  if (!empty($conditions)) {
+    $matching_statuses = array();
+
+    foreach ($statuses as $name => $status) {
+      // Check the status against the conditions array to determine whether to
+      // add it to the return array or not.
+      $valid = TRUE;
+
+      foreach ($conditions as $property => $value) {
+        // If the current value for the specified property on the status does
+        // not match the filter value...
+        if ($status[$property] != $value) {
+          // Do not add it to the temporary array.
+          $valid = FALSE;
+        }
+      }
+
+      if ($valid) {
+        $matching_statuses[$name] = $status;
+      }
+    }
+
+    return $matching_statuses;
+  }
+
+  return $statuses;
+}
+
+/**
+ * Resets the cached list of pattern statuses.
+ */
+function patternbuilder_pattern_statuses_reset() {
+  drupal_static_reset('patternbuilder_pattern_statuses');
+  cache_clear_all('patternbuilder_drupal:pattern_statuses', 'cache');
+}
+
+/**
+ * Returns info for a pattern status.
+ *
+ * @param string $name
+ *   The machine readable name string of the status to return.
+ *
+ * @return array|null
+ *   The fully loaded status information or NULL if not found.
+ */
+function patternbuilder_pattern_status_load($name) {
+  $statuses = patternbuilder_pattern_statuses();
+  return isset($statuses[$name]) ? $statuses[$name] : NULL;
+}
+
+/**
+ * Returns the human readable title of any or all pattern statuses.
+ *
+ * @param string $name
+ *   Optional parameter specifying the name of the pattern status whose title
+ *     to return.
+ *
+ * @return array|null
+ *   Either an array of all pattern status titles keyed by the name or a
+ *   string containing the human readable title for the specified status. If a
+ *   status is specified that does not exist, this function returns NULL.
+ */
+function patternbuilder_pattern_status_get_label($name = NULL) {
+  $statuses = patternbuilder_pattern_statuses();
+
+  // Return a status title if specified and it exists.
+  if (!empty($name)) {
+    return isset($statuses[$name]['label']) ? $statuses[$name]['label'] : NULL;
+  }
+
+  // Otherwise turn the array values into the status title only.
+  foreach ($statuses as $key => $status) {
+    $statuses[$key] = $status['label'];
+  }
+
+  return $statuses;
+}
+
+/**
+ * Returns status labels for use in option lists.
+ *
+ * @return array
+ *   An array of sanitize pattern status labels keyed by machine name.
+ */
+function patternbuilder_pattern_status_options_list() {
+  $options = array();
+  foreach (patternbuilder_pattern_statuses() as $name => $status) {
+    $options[$name] = check_plain($status['label']);
+  }
+
+  return $options;
+}
+
+/**
+ * Determine the default pattern status.
+ *
+ * @return array
+ *   The status info array for the default status.
+ */
+function patternbuilder_pattern_status_default() {
+  $default_name = variable_get('patternbuilder_pattern_status_default', NULL);
+  if (isset($default_name) && ($default = patternbuilder_pattern_status_load($default_name))) {
+    return $default;
+  }
+
+  $statuses = patternbuilder_pattern_statuses();
+  return $statuses ? reset($statuses) : NULL;
 }
 
 /**

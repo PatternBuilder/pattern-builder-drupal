@@ -37,6 +37,16 @@ function hook_patternbuilder_pattern_types() {
 }
 
 /**
+ * Alter pattern type information for the patternbuilder module.
+ *
+ * @return array
+ *   An array keyed by the pattern type machine name.
+ */
+function hook_patternbuilder_pattern_types_alter(&$types) {
+  $types['pattern']['label'] = t('Generic Pattern');
+}
+
+/**
  * Example callback for hook_patternbuilder_pattern_types 'claim_by_name'.
  *
  * @param string $machine_name
@@ -66,4 +76,63 @@ function MY_MODULE_pattern_type_claim_by_schema($machine_name, $schema) {
       return TRUE;
     }
   }
+}
+
+/**
+ * Defines pattern statuses.
+ *
+ * A pattern status controls the exposure of the pattern to Drupal. This
+ * includes importing, visibility in the field widget, and available to use
+ * on new nodes.
+ *
+ * The Pattern Builder module defines several statuses in its own
+ * implementation of this hook,
+ * patternbuilder_patternbuilder_pattern_status_info():
+ * - Active: imported, visible, creatable.
+ * - Private: imported, NOT visible, creatable.
+ * - Deprecated: imported, NOT visible, NOT creatable.
+ * - Inactive: NOT imported, NOT visible, NOT creatable.
+ *
+ * The status array structure is as follows:
+ * - label: Required. The translatable label of the status, used in
+ *   administrative interfaces.
+ * - weight: Optional. integer weight of the status used for sorting lists of
+ *   statuses. Defaults to 0.
+ * - import: Optional. TRUE to import the pattern if the
+ *   patternbuilder_importer module is enabled. Defaults to TRUE.
+ * - visible: Optional. TRUE to display in the field widget's default list.
+ *   If FALSE, the pattern must be explicitly selected in the field widget's
+ *   settings. Defaults to TRUE.
+ * - creatable: Optional. TRUE to allow selection on new entities.
+ *   Defaults to TRUE.
+ * - name: Internal only. The machine-name identifying the status using
+ *   lowercase alphanumeric characters, -, and _. Defaults to the array key.
+ * - module: Internal only. The module that defined the status.
+ *
+ * @return
+ *   An array of pattern status arrays keyed by machine name.
+ */
+function hook_patternbuilder_pattern_status_info() {
+  $statuses = array();
+
+  $statuses['my_custom_status'] = array(
+    'label' => t('Custom'),
+    'import' => TRUE,
+    'visible' => FALSE,
+    'creatable' => FALSE,
+  );
+
+  return $statuses;
+}
+
+/**
+ * Allows modules to alter the pattern status definitions of other modules.
+ *
+ * @param $statuses
+ *   An array of pattern statuses defined by enabled modules.
+ *
+ * @see hook_patternbuilder_pattern_status_info()
+ */
+function hook_patternbuilder_pattern_status_info_alter(&$statuses) {
+  $statuses['active']['label'] = t('Public');
 }

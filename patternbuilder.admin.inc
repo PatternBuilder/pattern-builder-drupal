@@ -89,6 +89,26 @@ function patternbuilder_settings_form($form, &$form_state) {
     )),
   );
 
+  // Pattern Status.
+  $form['pattern_status'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Pattern Status'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => t('Configure pattern statuses.'),
+  );
+
+  $status_options = patternbuilder_pattern_status_options_list();
+  $default_status = patternbuilder_pattern_status_default();
+  $default_status_key = isset($default_status['name']) ? $default_status['name'] : NULL;
+  $form['pattern_status']['patternbuilder_pattern_status_default'] = array(
+    '#type' => 'select',
+    '#title' => t('Default pattern status'),
+    '#description' => t('The default pattern status is used if the JSON schema does not specify a "status" property.'),
+    '#default_value' => $default_status_key,
+    '#options' => $status_options,
+  );
+
   $form['#validate'][] = 'patternbuilder_settings_form_validate';
   $form = system_settings_form($form);
   $form['#submit'][] = 'patternbuilder_settings_form_submit';
