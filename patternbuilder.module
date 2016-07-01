@@ -1582,11 +1582,21 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
   $widget = $instance['widget'];
   $settings = $widget['settings'] + field_info_widget_settings($widget['type']);
 
+  // Get some pattern info.
+  $components = patternbuilder_components_load();
+  $available_pattern_type_bundles = patternbuilder_components_get_pattern_type_bundles();
+  $invisible_statuses = patternbuilder_pattern_statuses(array(
+    'visible' => FALSE,
+  ));
+  $non_creatable_statuses = patternbuilder_pattern_statuses(array(
+    'creatable' => FALSE,
+  ));
+
   // Set allowed bundles to the allowed patterns.
   $available_bundles = paragraphs_bundle_load();
   $available_bundle_names = array_keys($available_bundles);
 
-  // Build instance allowed bundles.
+  // Build instance allowed bundles per the field settings.
   $instance_allowed_bundles = array();
   if (!empty($instance['settings']['allowed_bundles'])) {
     foreach ($instance['settings']['allowed_bundles'] as $bundle_setting_key => $bundle_setting_value) {
@@ -1596,13 +1606,13 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
     }
   }
 
-  if (empty($instance_allowed_bundles)) {
+  // Set to all bundles if none explicitly defined.
+  $has_unlimited_bundles = empty($instance_allowed_bundles);
+  if ($has_unlimited_bundles) {
     $instance_allowed_bundles = $available_bundle_names;
   }
 
   // Pattern type allowed bundles.
-  $available_pattern_type_bundles = patternbuilder_components_get_pattern_type_bundles();
-
   $pattern_types_allowed = array();
   if (isset($settings['allowed_pattern_types'])) {
     $pattern_types_allowed = array_keys(array_filter($settings['allowed_pattern_types']));
@@ -1621,6 +1631,22 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
 
   // Build allowed bundles.
   $allowed_bundles = array_intersect($pattern_allowed_bundles, $instance_allowed_bundles, $available_bundle_names);
+
+  // Remove non-visible and non-creatable patterns.
+  if ($has_unlimited_bundles && $invisible_statuses) {
+    foreach (array_keys($allowed_bundles) as $machine_name) {
+      if (isset($components[$machine_name]->status) && isset($invisible_statuses[$components[$machine_name]->status])) {
+        unset($allowed_bundles[$machine_name]);
+      }
+    }
+  }
+
+  // Remove non-creatable patterns.
+  foreach (array_keys($allowed_bundles) as $machine_name) {
+    if (isset($components[$machine_name]->status) && isset($non_creatable_statuses[$components[$machine_name]->status])) {
+      unset($allowed_bundles[$machine_name]);
+    }
+  }
 
   // Override instance settings.
   $instance['settings']['allowed_bundles'] = array_combine($allowed_bundles, $allowed_bundles);
