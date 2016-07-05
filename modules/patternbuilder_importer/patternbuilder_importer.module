@@ -348,12 +348,18 @@ function patternbuilder_importer_file_get_schema_object($jsonschema_file, $reset
  *   - 'schema': File contents JSON decoded.
  */
 function patternbuilder_importer_process_properties(array $patterns) {
+  $non_imported_statuses = patternbuilder_pattern_statuses(array(
+    'import' => FALSE,
+  ), TRUE);
+
   // Create bundles first so fields can reference other bundles.
   _patternbuilder_importer_print(t('Processing bundles and field bases...'), NULL, FALSE);
   foreach ($patterns as $machine_name => &$pattern_info) {
     if (!isset($pattern_info['schema'])) {
       continue;
     }
+
+    $pattern_info['machine_name'] = $machine_name;
 
     $pattern_type_name = isset($pattern_info['pattern_type']) ? $pattern_info['pattern_type'] : '';
     if (empty($pattern_type_name)) {
@@ -371,14 +377,30 @@ function patternbuilder_importer_process_properties(array $patterns) {
       }
     }
 
-    $pattern_label = isset($pattern_info['schema']->title) ? $pattern_info['schema']->title : $machine_name;
-    if (empty($pattern_info['is_resolved'])) {
-      // Schema imported to a paragraph bundle.
-      patternbuilder_importer_create_bundle($pattern_info['schema'], $machine_name, $pattern_label, $pattern_type_name);
+    $pattern_info['status'] = !empty($pattern_info['schema']->status) ? $pattern_info['schema']->status : NULL;
+    $pattern_info['is_imported'] = empty($pattern_info['status']) || !isset($non_imported_statuses[$pattern_info['status']]);
+    $pattern_info['label'] = isset($pattern_info['schema']->title) ? $pattern_info['schema']->title : $machine_name;
+    if ($pattern_info['is_imported']) {
+      if (empty($pattern_info['is_resolved'])) {
+        // Schema imported to a paragraph bundle.
+        patternbuilder_importer_create_bundle($pattern_info);
+      }
+      elseif (!empty($pattern_info['is_single_field'])) {
+        // Schema imported to a field.
+        patternbuilder_importer_create_field($pattern_info);
+      }
     }
-    elseif (!empty($pattern_info['is_single_field'])) {
-      // Schema imported to a field.
-      patternbuilder_importer_create_field($pattern_info['schema'], $machine_name, $pattern_label, $pattern_type_name);
+    elseif ($component = patternbuilder_components_load($machine_name)) {
+      // Update status of existing component that is no longer imported.
+      $component_status = 'pbi_not_imported';
+      if (!empty($pattern_info['schema']->status)) {
+        $component_status = $pattern_info['schema']->status;
+      }
+      elseif (reset($non_imported_statuses)) {
+        $component_status = key($non_imported_statuses);
+      }
+      $component->status = $component_status;
+      patternbuilder_component_save($component);
     }
   }
 
@@ -387,7 +409,7 @@ function patternbuilder_importer_process_properties(array $patterns) {
 
   _patternbuilder_importer_print(t('done.'));
 
-  // Load the components map.
+  // Load a fresh components map.
   // Covers the issue if another process is also adding components.
   $components_map = patternbuilder_components_load(NULL, TRUE);
 
@@ -397,15 +419,22 @@ function patternbuilder_importer_process_properties(array $patterns) {
       continue;
     }
 
+    $component = isset($components_map[$machine_name]) ? $components_map[$machine_name] : NULL;
     $msg_tokens = array(
       '@name' => $machine_name,
+      '@status' => !empty($pattern_info['status']) ? $pattern_info['status'] : 'unknown',
     );
+
+    if (empty($pattern_info['is_imported'])) {
+      _patternbuilder_importer_print(t('Skipping @name, not importable with status "@status".', $msg_tokens));
+      continue;
+    }
+
     _patternbuilder_importer_print(t('Processing fields for @name...', $msg_tokens), NULL, FALSE);
-    $component_map = isset($components_map[$machine_name]) ? $components_map[$machine_name] : NULL;
-    if (isset($pattern_info['schema']) && !empty($component_map->id) && !empty($component_map->bundle_name)) {
+    if (isset($pattern_info['schema']) && !empty($component->id) && !empty($component->bundle_name)) {
       if (isset($pattern_info['schema']->properties)) {
         $weight = 0;
-        $factory = patternbuilder_importer_create_factory($component_map->id, $component_map->bundle_name, $weight);
+        $factory = patternbuilder_importer_create_factory($component->id, $component->bundle_name, $weight);
         if (isset($factory)) {
           $required_properties = isset($pattern_info['schema']->required) ? $pattern_info['schema']->required : array();
           $factory->process_properties($pattern_info['schema']->properties, $required_properties);
@@ -420,25 +449,32 @@ function patternbuilder_importer_process_properties(array $patterns) {
 /**
  * Creates the paragraphs bundle or updates existing.
  *
- * @param string $schema
- *   The schema object.
- * @param string $machine_name
- *   Machine name for the component.
- * @param string $label
- *   Human readable name of the bundle.
- * @param string $pattern_type_name
- *   The pattern type machine name.
+ * @param array $pattern_info
+ *   The pattern info which includes the following:
+ *   - machine_name (string): Required. The pattern machine name.
+ *   - schema (object): The schema object.
+ *   - label (string): The human readable label.
+ *   - status (string|null): The pattern status.
+ *   - pattern_type (string): The pattern type.
+ *   - is_resolved (bool): TRUE if the pattern type is set to resolve in place.
+ *   - is_single_field (bool): TRUE if the pattern is imported to a field.
+ *   - is_imported (bool): TRUE if the pattern should be imported.
  *
- * @return object
- *   The bundle object.
+ * @return object|null
+ *   The bundle object or NULL if the bundle could not be created.
  */
-function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $pattern_type_name = 'pb_default') {
+function patternbuilder_importer_create_bundle($pattern_info) {
   $bundle_prefix = 'pbi';
 
-  // Set default pattern type.
-  if (empty($pattern_type_name)) {
-    $pattern_type_name = patternbuilder_default_pattern_type();
+  // Machine name is required.
+  if (empty($pattern_info['machine_name'])) {
+    return NULL;
   }
+
+  $machine_name = $pattern_info['machine_name'];
+
+  // Set default pattern type.
+  $pattern_type_name = !empty($pattern_info['pattern_type']) ? $pattern_info['pattern_type'] : patternbuilder_default_pattern_type();
 
   // Get pattern type bundle data.
   if ($pattern_type_name) {
@@ -451,7 +487,7 @@ function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $
   }
 
   // Create bundle label.
-  $bundle_label = drupal_ucfirst($label);
+  $bundle_label = !empty($pattern_info['label']) ? drupal_ucfirst($pattern_info['label']) : $pattern_info['machine_name'];
 
   // Create bundle object.
   $bundle = new stdClass();
@@ -481,8 +517,8 @@ function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $
       );
 
       // Set status.
-      if (!empty($schema->status)) {
-        $component_fields['status'] = $schema->status;
+      if (!empty($pattern_info['status'])) {
+        $component_fields['status'] = $pattern_info['status'];
       }
       patternbuilder_component_save($component_fields);
     }
@@ -494,35 +530,32 @@ function patternbuilder_importer_create_bundle($schema, $machine_name, $label, $
 /**
  * Creates the pattern field component.
  *
- * @param string $schema
- *   The schema object.
- * @param string $machine_name
- *   Machine name for the component.
- * @param string $label
- *   Human readable name of the field.
- * @param string $pattern_type_name
- *   The pattern type machine name.
+ * @param array $pattern_info
+ *   See patternbuilder_importer_create_bundle().
  *
  * @return object
  *   The component object.
  */
-function patternbuilder_importer_create_field($schema, $machine_name, $label, $pattern_type_name = 'pb_default') {
+function patternbuilder_importer_create_field($pattern_info) {
   // Custom prefix to avoid collisions with the fields created in the field UI.
   $field_prefix = 'pbi';
 
+  // Machine name is required.
+  if (empty($pattern_info['machine_name'])) {
+    return NULL;
+  }
+
+  $machine_name = $pattern_info['machine_name'];
+
   // Get existing component.
   $component = patternbuilder_components_load($machine_name);
-  $is_new = FALSE;
-
   if (empty($component->id)) {
     $component = new stdClass();
     $component->machine_name = $machine_name;
   }
 
   // Set default pattern type.
-  if (empty($pattern_type_name)) {
-    $pattern_type_name = patternbuilder_default_pattern_type();
-  }
+  $pattern_type_name = !empty($pattern_info['pattern_type']) ? $pattern_info['pattern_type'] : patternbuilder_default_pattern_type();
   $component->pattern_type = $pattern_type_name;
 
   if (empty($component->field_name)) {
@@ -531,8 +564,8 @@ function patternbuilder_importer_create_field($schema, $machine_name, $label, $p
   }
 
   // Set status.
-  if (!empty($schema->status)) {
-    $component->status = $schema->status;
+  if (!empty($pattern_info['status'])) {
+    $component->status = $pattern_info['status'];
   }
 
   // Save the component.

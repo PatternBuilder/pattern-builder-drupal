@@ -60,6 +60,18 @@ function patternbuilder_menu() {
 }
 
 /**
+ * Implements hook_menu_alter().
+ */
+function patternbuilder_menu_alter(&$items) {
+  // Override paragaphs bundle list to add "Pattern" link.
+  if (isset($items['admin/structure/paragraphs'])) {
+    $items['admin/structure/paragraphs']['page callback'] = 'patternbuilder_paragraphs_admin_bundle_overview';
+    $items['admin/structure/paragraphs']['file'] = 'patternbuilder.admin.inc';
+    $items['admin/structure/paragraphs']['file path'] = drupal_get_path('module', 'patternbuilder');
+  }
+}
+
+/**
  * Access callback for patternbuilder_admin_bundle_form.
  *
  * @param object $bundle
@@ -520,13 +532,24 @@ function patternbuilder_get_pattern_types($pattern_type_name = NULL, $rebuild = 
 /**
  * Returns a list of pattern type labels.
  *
- * @return array
- *   An array keyed by pattern type machine name with labels as values.
+ * @param string $name
+ *   Optional parameter specifying the name of the pattern status whose title
+ *   to return.
+ *
+ * @return array|string
+ *   An array keyed by pattern type machine name with labels as values or a
+ *   single label if the name is provided.
  */
-function patternbuilder_pattern_types_labels() {
+function patternbuilder_pattern_types_labels($name = NULL) {
   $labels = array();
-
   $types = patternbuilder_get_pattern_types();
+
+  // Return a status title if specified and it exists.
+  if (!empty($name)) {
+    return isset($types[$name]['label']) ? $types[$name]['label'] : NULL;
+  }
+
+  // Return all.
   if ($types) {
     foreach ($types as $name => $info) {
       $label = isset($info['label']) ? $info['label'] : $name;

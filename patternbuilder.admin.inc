@@ -325,3 +325,53 @@ function patternbuilder_admin_bundle_form_submit($form, &$form_state, $bundle = 
     drupal_set_message(t('There were no changes to the pattern.'));
   }
 }
+
+/**
+ * Override page callback for paragraphs bundle list.
+ */
+function patternbuilder_paragraphs_admin_bundle_overview() {
+  module_load_include('inc', 'paragraphs', 'paragraphs.admin');
+  $page = paragraphs_admin_bundle_overview();
+
+  if (!empty($page['paragraphs_bundle_table']['#rows'])) {
+    // Expand the header column to accomodate the new column.
+    if (isset($page['paragraphs_bundle_table']['#header'][1]['colspan'])) {
+      $page['paragraphs_bundle_table']['#header'][1]['colspan'] = 5;
+    }
+
+    // Get components.
+    $bundle_components = patternbuilder_get_bundle_component_map();
+
+    // Alter bundle rows.
+    foreach ($page['paragraphs_bundle_table']['#rows'] as $bundle_name => &$row) {
+      $bundle_url_string = strtr($bundle_name, array('_' => '-'));
+
+      // If bundle is a pattern ...
+      if (!empty($bundle_components[$bundle_name])) {
+        $component = $bundle_components[$bundle_name];
+
+        // Pattern info in bundle label column.
+        if (!empty($row[0]['data'])) {
+          $row[0]['data'] .= '<div class="patternbuilder-label-info">';
+          $row[0]['data'] .= t('@type: @name (@status)', array(
+            '@name' => $component->machine_name,
+            '@type' => !empty($component->pattern_type) ? patternbuilder_pattern_types_labels($component->pattern_type) : '',
+            '@status' => !empty($component->status) ? patternbuilder_pattern_status_get_label($component->status) : '',
+          ));
+          $row[0]['data'] .= '</div>';
+        }
+
+        // Pattern form link column.
+        $row[] = array(
+          'data' => l(t('manage pattern'), 'admin/structure/paragraphs/' . $bundle_url_string . '/patternbuilder')
+        );
+      }
+      else {
+        // Empty string for the Pattern form link column.
+        $row[] = array('data' => '&nbsp');
+      }
+    }
+  }
+
+  return $page;
+}
