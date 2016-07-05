@@ -112,7 +112,7 @@ function patternbuilder_settings_form($form, &$form_state) {
   $form['pattern_status']['patternbuilder_pattern_status_default'] = array(
     '#type' => 'select',
     '#title' => t('Default pattern status'),
-    '#description' => t('The default pattern status is used when creating new patterns that do not have a defined status. Refer to the table below for information on the available statuses.'),
+    '#description' => t('The default pattern status is used when creating new patterns that do not have a defined status. The Pattern Builder importer sets the status based on the value of the JSON schema property "status". The JSON value should be the machine name of the status. Refer to the table below for information on the available statuses.'),
     '#default_value' => $default_status_key,
     '#options' => $status_options,
   );
@@ -285,7 +285,7 @@ function patternbuilder_admin_bundle_form($form, &$form_state, $bundle = NULL) {
   $form['status_wrapper']['status'] = array(
     '#type' => 'select',
     '#title' => t('Pattern status'),
-    '#description' => t('Refer to the table below for information on the available statuses.'),
+    '#description' => t('The Pattern Builder importer sets the status based on the value of the JSON schema property "status". The JSON value should be the machine name of the status. Refer to the table below for information on the available statuses. '),
     '#default_value' => isset($component->status) ? $component->status : $default_status_key,
     '#options' => $status_options,
     '#disabled' => !$ui_access['status'],

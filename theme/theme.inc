@@ -117,7 +117,7 @@ function theme_patternbuilder_pattern_statuses($vars) {
   }
 
   $statuses_headers = array(
-    t('Label'), t('Module'), t('Imported'), t('Visible'), t('Creatable'),
+    t('Label (Machine name)'), t('Module'), t('Imported'), t('Visible'), t('Creatable'),
   );
   $status_booleans = array('import', 'visible', 'creatable');
   $statuses_rows = array();
