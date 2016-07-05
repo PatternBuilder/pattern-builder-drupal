@@ -119,8 +119,8 @@ class pbi_field_ref extends pbi_field implements pbi_ref_interface {
    * @param object $property
    *   The property object.
    *
-   * @return string
-   *   The extracted field name.
+   * @return array|null
+   *   The extracted Drupal field instance.
    */
   public static function find_reference_field_instance($property) {
     // Reference in the form of "quote.json#/properties/quotation".
@@ -135,7 +135,7 @@ class pbi_field_ref extends pbi_field implements pbi_ref_interface {
 
         if ($machine_name && $ref_property_name) {
           $component = patternbuilder_components_load($machine_name);
-          if (isset($component->id) && !empty($component->bundle_name)) {
+          if (isset($component->id)) {
             // Determine if reference is allowed based on the status.
             if (!empty($component->status)) {
               // Log error for references to non-imported schemas.
@@ -161,14 +161,10 @@ class pbi_field_ref extends pbi_field implements pbi_ref_interface {
               }
             }
 
-            $field_instances = field_info_instances('paragraphs_item', $component->bundle_name);
-            if ($field_instances) {
-              foreach ($field_instances as $field_name => $field_instance) {
-                $pb_settings = _patternbuilder_field_instance_settings($field_instance);
-                if (isset($pb_settings['real_property_name']) && $pb_settings['real_property_name'] == $ref_property_name) {
-                  return $field_instance;
-                }
-              }
+            // Find bundle field matching the property reference.
+            $field_instance = patternbuilder_field_info_property_instance($component->machine_name, array($ref_property_name));
+            if ($field_instance) {
+              return $field_instance;
             }
           }
         }

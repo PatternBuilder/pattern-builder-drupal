@@ -390,17 +390,17 @@ function patternbuilder_importer_process_properties(array $patterns) {
         patternbuilder_importer_create_field($pattern_info);
       }
     }
-    elseif ($component = patternbuilder_components_load($machine_name)) {
-      // Update status of existing component that is no longer imported.
-      $component_status = 'pbi_not_imported';
-      if (!empty($pattern_info['schema']->status)) {
-        $component_status = $pattern_info['schema']->status;
-      }
-      elseif (reset($non_imported_statuses)) {
-        $component_status = key($non_imported_statuses);
-      }
-      $component->status = $component_status;
-      patternbuilder_component_save($component);
+    else {
+      // Create / update component that is not imported.
+      // A component needs to be created in order to detect invalid schema
+      // references to schemas that are not imported or creatable.
+      $component_fields = array(
+        'machine_name' => $machine_name,
+        'pattern_type' => $pattern_type_name,
+        'status' => !empty($pattern_info['status']) ? $pattern_info['status'] : 'pbi_not_imported',
+      );
+
+      patternbuilder_component_save($component_fields);
     }
   }
 

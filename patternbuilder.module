@@ -889,14 +889,6 @@ function patternbuilder_component_save(&$component) {
     $record['pattern_type'] = patternbuilder_default_pattern_type();
   }
 
-  if (empty($record['bundle_name'])) {
-    $record['bundle_name'] = NULL;
-  }
-
-  if (empty($record['field_name'])) {
-    $record['field_name'] = NULL;
-  }
-
   if (empty($record['status']) && empty($current_component)) {
     $default_status = patternbuilder_pattern_status_default();
     $default_status_key = isset($default_status['name']) ? $default_status['name'] : NULL;
@@ -928,7 +920,9 @@ function patternbuilder_component_save(&$component) {
     }
   }
   elseif (is_array($component)) {
-    $component[$property] = $property_value;
+    foreach ($updated_component as $property => $property_value) {
+      $component[$property] = $property_value;
+    }
   }
 
   return $updated_component;
