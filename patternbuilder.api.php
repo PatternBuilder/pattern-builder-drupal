@@ -39,7 +39,7 @@ function hook_patternbuilder_pattern_types() {
 /**
  * Alter pattern type information for the patternbuilder module.
  *
- * @return array
+ * @param array $types
  *   An array keyed by the pattern type machine name.
  */
 function hook_patternbuilder_pattern_types_alter(&$types) {
@@ -55,7 +55,7 @@ function hook_patternbuilder_pattern_types_alter(&$types) {
  * @return bool
  *   TRUE to claim the pattern.
  */
-function MY_MODULE_pattern_type_claim_by_name($machine_name) {
+function my_module_pattern_type_claim_by_name($machine_name) {
   return stripos($machine_name, 'pattern') !== FALSE;
 }
 
@@ -70,7 +70,7 @@ function MY_MODULE_pattern_type_claim_by_name($machine_name) {
  * @return bool
  *   TRUE to claim the pattern.
  */
-function MY_MODULE_pattern_type_claim_by_schema($machine_name, $schema) {
+function my_module_pattern_type_claim_by_schema($machine_name, $schema) {
   if (stripos($machine_name, 'pattern') !== FALSE) {
     if (isset($schema->myCustomTypeProperty) && $schema->myCustomTypeProperty == 'my_custom_type') {
       return TRUE;
@@ -109,7 +109,7 @@ function MY_MODULE_pattern_type_claim_by_schema($machine_name, $schema) {
  *   lowercase alphanumeric characters, -, and _. Defaults to the array key.
  * - module: Internal only. The module that defined the status.
  *
- * @return
+ * @return array
  *   An array of pattern status arrays keyed by machine name.
  */
 function hook_patternbuilder_pattern_status_info() {
@@ -128,7 +128,7 @@ function hook_patternbuilder_pattern_status_info() {
 /**
  * Allows modules to alter the pattern status definitions of other modules.
  *
- * @param $statuses
+ * @param array $statuses
  *   An array of pattern statuses defined by enabled modules.
  *
  * @see hook_patternbuilder_pattern_status_info()
