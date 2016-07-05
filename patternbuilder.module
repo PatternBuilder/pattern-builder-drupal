@@ -725,6 +725,78 @@ function patternbuilder_components_get_pattern_type_bundles($pattern_type_name =
 }
 
 /**
+ * Determine if the component is imported.
+ *
+ * @param object|string $component
+ *   The component object or machine name.
+ *
+ * @return bool
+ *   TRUE if the component is a resolved schema.
+ */
+function patternbuilder_component_is_imported($component) {
+  if (is_string($component)) {
+    $component = patternbuilder_components_load($component);
+  }
+
+  if (!empty($component->status)) {
+    $statuses = patternbuilder_pattern_statuses(array(
+      'import' => TRUE,
+    ));
+    return isset($statuses[$component->status]);
+  }
+
+  return TRUE;
+}
+
+/**
+ * Determine if the component is creatable.
+ *
+ * @param object|string $component
+ *   The component object or machine name.
+ *
+ * @return bool
+ *   TRUE if the component is a resolved schema.
+ */
+function patternbuilder_component_is_creatable($component) {
+  if (is_string($component)) {
+    $component = patternbuilder_components_load($component);
+  }
+
+  if (!empty($component->status)) {
+    $statuses = patternbuilder_pattern_statuses(array(
+      'creatable' => TRUE,
+    ));
+    return isset($statuses[$component->status]);
+  }
+
+  return TRUE;
+}
+
+/**
+ * Determine if the component is visible in the widget.
+ *
+ * @param object|string $component
+ *   The component object or machine name.
+ *
+ * @return bool
+ *   TRUE if the component is a resolved schema.
+ */
+function patternbuilder_component_is_widget_visible($component) {
+  if (is_string($component)) {
+    $component = patternbuilder_components_load($component);
+  }
+
+  if (!empty($component->status)) {
+    $statuses = patternbuilder_pattern_statuses(array(
+      'visible' => TRUE,
+    ));
+    return isset($statuses[$component->status]);
+  }
+
+  return TRUE;
+}
+
+/**
  * Determine if the component is resolved.
  *
  * @param object|string $component

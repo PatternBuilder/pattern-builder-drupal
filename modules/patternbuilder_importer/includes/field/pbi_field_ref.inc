@@ -136,6 +136,31 @@ class pbi_field_ref extends pbi_field implements pbi_ref_interface {
         if ($machine_name && $ref_property_name) {
           $component = patternbuilder_components_load($machine_name);
           if (isset($component->id) && !empty($component->bundle_name)) {
+            // Determine if reference is allowed based on the status.
+            if (!empty($component->status)) {
+              // Log error for references to non-imported schemas.
+              if (!patternbuilder_component_is_imported($component)) {
+                watchdog('patternbuilder_importer', 'The property references a schema that is not imported due to the status "@status": @ref', array(
+                  '@ref' => $property->{'$ref'},
+                  '@status' => !empty($non_imported_statuses[$component->status]['label']) ? $non_imported_statuses[$component->status]['label'] : $component->status,
+                ), WATCHDOG_ERROR);
+
+                // Skip reference.
+                return array();
+              }
+
+              // Log warning for references to non-creatable schemas.
+              if (!patternbuilder_component_is_creatable($component)) {
+                watchdog('patternbuilder_importer', 'The property references a schema that is not creatable due to the status "@status": @ref', array(
+                  '@ref' => $property->{'$ref'},
+                  '@status' => !empty($non_creatable_statuses[$component->status]['label']) ? $non_creatable_statuses[$component->status]['label'] : $component->status,
+                ), WATCHDOG_WARNING);
+
+                // Skip reference.
+                return array();
+              }
+            }
+
             $field_instances = field_info_instances('paragraphs_item', $component->bundle_name);
             if ($field_instances) {
               foreach ($field_instances as $field_name => $field_instance) {
