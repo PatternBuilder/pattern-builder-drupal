@@ -101,3 +101,46 @@ function patternbuilder_render_schema(ParagraphsItemEntity $entity, $view_mode =
     }
   }
 }
+
+/**
+ * Theme a list of pattern statuses.
+ *
+ * @param array $vars
+ *   The theme variables.
+ *
+ * @return string
+ *   HTML markup to display the list of statuses.
+ */
+function theme_patternbuilder_pattern_statuses($vars) {
+  if (empty($vars['statuses'])) {
+    return '';
+  }
+
+  $statuses_headers = array(
+    t('Label (Machine name)'), t('Module'), t('Imported'), t('Visible in widget'), t('Creatable'),
+  );
+  $status_booleans = array('import', 'visible', 'creatable');
+  $statuses_rows = array();
+  foreach ($vars['statuses'] as $status_key => $status) {
+    $status_row = array();
+    $status_row[] = t('@label (@name)', array(
+      '@label' => $status['label'],
+      '@name' => $status_key,
+    ));
+    $status_row[] = check_plain($status['module']);
+
+    foreach ($status_booleans as $status_boolean_key) {
+      $status_row[] = !empty($status[$status_boolean_key]) ? t('Yes') : t('No');
+    }
+
+    $statuses_rows[] = $status_row;
+  }
+
+  if ($statuses_rows) {
+    return theme('table', array(
+      'header' => $statuses_headers,
+      'rows' => $statuses_rows,
+    ));
+  }
+  return '';
+}

@@ -72,7 +72,7 @@ class pbi_field_paragraph extends pbi_field {
       }
 
       if (isset($items)) {
-        $settings = $this->build_paragraphs_bundle_settings($items);
+        $settings = $this->build_paragraphs_bundle_settings($items, $field);
         $field['instance']['settings'] = array_merge($field['instance']['settings'], $settings);
       }
     }
@@ -88,19 +88,47 @@ class pbi_field_paragraph extends pbi_field {
    *
    * @param array $items
    *   All of the items in allOf or oneOf.
+   * @param array $import
+   *   Combined array of the imported field base and instance.
    *
    * @return array
    *   Settings array for the widget.
    */
-  private function build_paragraphs_bundle_settings(array $items) {
+  private function build_paragraphs_bundle_settings(array $items, array $import = array()) {
     $bundle_weight = 0;
     $settings = array();
 
     foreach ($items as $ref_comp) {
       $machine_name = patternbuilder_clean_schema_machine_name($ref_comp->{'$ref'});
-      $component_map = patternbuilder_components_load($machine_name);
-      if (!empty($component_map->bundle_name)) {
-        $bundle_name = $component_map->bundle_name;
+      $component = patternbuilder_components_load($machine_name);
+      if (!empty($component->bundle_name)) {
+        $bundle_name = $component->bundle_name;
+
+        // Warn about invalid references based on the status.
+        // Only a warning to allow the field settings to be saved with any
+        // scheme. The patternbuilder field widget will filter out statuses
+        // that should not be shown in the options list.
+        if (!empty($component->status)) {
+          // Log error for references to non-imported schemas.
+          if (!patternbuilder_component_is_imported($component)) {
+            watchdog('patternbuilder_importer', 'The paragraphs field @field_name references a schema that is not imported due to the status "@status", schema: @machine_name', array(
+              '@field_name' => !empty($import['base']['field_name']) ? '"' . $import['base']['field_name'] . '"' : '',
+              '@machine_name' => $machine_name,
+              '@status' => patternbuilder_pattern_status_get_label($component->status),
+            ), WATCHDOG_WARNING);
+          }
+
+          // Log warning for references to non-creatable schemas.
+          if (!patternbuilder_component_is_creatable($component)) {
+            watchdog('patternbuilder_importer', 'The paragraphs field @field_name references a schema that is not creatable due to the status "@status", schema: @machine_name', array(
+              '@field_name' => !empty($import['base']['field_name']) ? '"' . $import['base']['field_name'] . '"' : '',
+              '@machine_name' => $machine_name,
+              '@status' => patternbuilder_pattern_status_get_label($component->status),
+            ), WATCHDOG_WARNING);
+          }
+        }
+
+        // Update widget settings.
         $settings['allowed_bundles'][$bundle_name] = $bundle_name;
         $settings['bundle_weights'][$bundle_name] = $bundle_weight++;
       }
