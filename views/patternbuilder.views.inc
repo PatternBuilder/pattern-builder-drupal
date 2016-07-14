@@ -87,6 +87,26 @@ function patternbuilder_views_data() {
     ),
   );
 
+  $data['patternbuilder_components']['status'] = array(
+    'title' => t('Pattern status'),
+    'help' => t('The patternbuilder pattern status.'),
+    'field' => array(
+      'handler' => 'views_handler_field_machine_name',
+      'options callback' => 'patternbuilder_pattern_status_get_label',
+      'click sortable' => TRUE,
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_in_operator',
+      'options callback' => 'patternbuilder_pattern_status_get_label',
+    ),
+    'argument' => array(
+      'handler' => 'patternbuilder_views_handler_argument_pattern_status',
+    ),
+  );
+
   $data['patternbuilder_components']['bundle_name'] = array(
     'title' => t('Paragraph bundle'),
     'help' => t('The patternbuilder paragraph bundle.'),

@@ -28,14 +28,18 @@ function patternbuilder_schema() {
         'description' => 'Pattern type.',
         'type' => 'varchar',
         'length' => 64,
-        'default' => '',
         'not null' => TRUE,
+      ),
+      'status' => array(
+        'description' => 'The status name of this pattern.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
       ),
       'bundle_name' => array(
         'description' => 'Entity bundle name.',
         'type' => 'varchar',
         'length' => 64,
-        'default' => '',
         'not null' => FALSE,
       ),
       'field_name' => array(
@@ -385,6 +389,31 @@ function patternbuilder_update_7102() {
     foreach ($field_inserts as $field) {
       if (isset($schema['fields'][$field]) && !db_field_exists($table, $field)) {
         db_add_field($table, $field, $schema['fields'][$field]);
+      }
+    }
+  }
+}
+
+/**
+ * Add status field, set pattern_type and bundle_name field default to NULL.
+ */
+function patternbuilder_update_7103() {
+  $table = 'patternbuilder_components';
+  $field_changes = array('status', 'pattern_type', 'bundle_name');
+
+  if (!db_table_exists($table)) {
+    drupal_install_schema('patternbuilder');
+  }
+  else {
+    $schema = drupal_get_schema_unprocessed('patternbuilder', $table);
+    foreach ($field_changes as $field) {
+      if (isset($schema['fields'][$field])) {
+        if (!db_field_exists($table, $field)) {
+          db_add_field($table, $field, $schema['fields'][$field]);
+        }
+        else {
+          db_change_field($table, $field, $field, $schema['fields'][$field]);
+        }
       }
     }
   }

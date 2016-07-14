@@ -39,3 +39,43 @@ QA the code in your pattern library and import those changes in seconds.
 * Media YouTube: Support for YouTube videos.
   (https://www.drupal.org/project/media_youtube)
 * Link: Support for link fields. (https://www.drupal.org/project/link)
+
+
+## Setup Walkthrough
+
+- Make sure [composer is installed](https://getcomposer.org/doc/00-intro.md)
+- [Install D7](https://www.drupal.org/drupal-7.0)
+- `drush en patternbuilder -y`
+- `drush en patternbuilder_importer -y`
+- CD to `sites/all/libraries`
+- `git clone https://github.com/PatternBuilder/pattern-builder-lib-php.git patternbuilder`
+- `cd patternbuilder && composer install`
+- Create a templates and schemas folder (location is up to you)
+- Goto `admin/config/content/patternbuilder` set configuration to point to those folders
+
+```
+#schemas/foo.json#
+
+{
+  "type": "object",
+  "properties": {
+    “bar”: {
+      "type": "string"
+    }
+  }
+}
+```
+```
+#templates/foo.twig#
+
+{{bar}}
+```
+
+- Run pattern builder importer `drush pbi` or `drush pbi foo`
+- Goto/Create content type
+- Manage fields
+- Add new field -> Paragraphs
+- Manage display
+- Change format to “Patternbuilder rendered item”
+- Create new content type and add `foo` paragraph
+- You'll have a single field `bar` that will be rendered directly through `foo.twig`

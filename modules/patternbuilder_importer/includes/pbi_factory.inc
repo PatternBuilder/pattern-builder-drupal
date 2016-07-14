@@ -125,6 +125,32 @@ class pbi_factory {
   }
 
   /**
+   * Get all meta type handler classes.
+   *
+   * @return array
+   *   An array of handler classes keyed by meta type.
+   */
+  public static function meta_type_handlers() {
+    $handlers = &drupal_static('pbi_factory.' . __FUNCTION__);
+    if (!isset($handlers)) {
+      $handlers = array(
+        'field' => 'pbi_field',
+        'field_ref' => 'pbi_field_ref',
+        'field_group_ref' => 'pbi_field_group_ref',
+        'field_group' => 'pbi_field_group',
+        'field_collection' => 'pbi_field_collection',
+        'paragraph' => 'pbi_field_paragraph',
+        'field_link' => 'pbi_field_link',
+        'field_file' => 'pbi_field_media',
+        'field_image' => 'pbi_field_image',
+        'field_audio' => 'pbi_field_audio',
+        'field_video' => 'pbi_field_video',
+      );
+    }
+    return $handlers;
+  }
+
+  /**
    * Retrieves the handler class for a given meta type.
    *
    * @param string $meta_type
@@ -134,40 +160,8 @@ class pbi_factory {
    *   The field handler class name.
    */
   public static function get_meta_type_handler($meta_type) {
-    switch ($meta_type) {
-      case 'field':
-        return 'pbi_field';
-
-      case 'field_ref':
-        return 'pbi_field_ref';
-
-      case 'field_group_ref':
-        return 'pbi_field_group_ref';
-
-      case 'field_group':
-        return 'pbi_field_group';
-
-      case 'field_collection':
-        return 'pbi_field_collection';
-
-      case 'paragraph':
-        return 'pbi_field_paragraph';
-
-      case 'field_link':
-        return 'pbi_field_link';
-
-      case 'field_file':
-        return 'pbi_field_media';
-
-      case 'field_image':
-        return 'pbi_field_image';
-
-      case 'field_audio':
-        return 'pbi_field_audio';
-
-      case 'field_video':
-        return 'pbi_field_video';
-    }
+    $handlers = static::meta_type_handlers();
+    return isset($handlers[$meta_type]) ? $handlers[$meta_type] : NULL;
   }
 
   /**
