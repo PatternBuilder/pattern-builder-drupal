@@ -314,7 +314,7 @@ function patternbuilder_admin_bundle_form($form, &$form_state, $bundle = NULL) {
 /**
  * Submit handler for the pattern form of a paragraph bundle.
  */
-function patternbuilder_admin_bundle_form_submit($form, &$form_state, $bundle = NULL) {
+function patternbuilder_admin_bundle_form_submit($form, &$form_state) {
   // Update the component if the status is set.
   if (!empty($form_state['values']['status']) && !empty($form_state['patternbuilder_component'])) {
     $form_state['patternbuilder_component']->status = $form_state['values']['status'];
