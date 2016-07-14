@@ -962,18 +962,21 @@ function patternbuilder_pattern_statuses($conditions = array(), $rebuild = FALSE
       $statuses = array();
       foreach (module_implements('patternbuilder_pattern_status_info') as $module) {
         foreach (module_invoke($module, 'patternbuilder_pattern_status_info') as $name => $status) {
-          $statuses[$name] = $status;
-          $statuses[$name]['module'] = $module;
+          // Only allow valid status names.
+          if (drupal_strlen($name) <= 32) {
+            $statuses[$name] = $status;
+            $statuses[$name]['module'] = $module;
 
-          // Set defaults.
-          $statuses[$name] += array(
-            'name' => $name,
-            'label' => $name,
-            'weight' => 0,
-            'import' => TRUE,
-            'visible' => TRUE,
-            'creatable' => TRUE,
-          );
+            // Set defaults.
+            $statuses[$name] += array(
+              'name' => $name,
+              'label' => $name,
+              'weight' => 0,
+              'import' => TRUE,
+              'visible' => TRUE,
+              'creatable' => TRUE,
+            );
+          }
         }
       }
     }

@@ -33,7 +33,7 @@ function patternbuilder_schema() {
       'status' => array(
         'description' => 'The status name of this pattern.',
         'type' => 'varchar',
-        'length' => '255',
+        'length' => 32,
         'not null' => FALSE,
       ),
       'bundle_name' => array(

@@ -106,7 +106,9 @@ function my_module_pattern_type_claim_by_schema($machine_name, $schema) {
  * - creatable: Optional. TRUE to allow selection on new entities.
  *   Defaults to TRUE.
  * - name: Internal only. The machine-name identifying the status using
- *   lowercase alphanumeric characters, -, and _. Defaults to the array key.
+ *   lowercase alphanumeric characters, -, and _.
+ *   Defaults to the array key. Max 32 characters, if exceeded then the status
+ *   is ignored.
  * - module: Internal only. The module that defined the status.
  *
  * @return array
