@@ -12,25 +12,25 @@ function patternbuilder_patternbuilder_pattern_status_info() {
   $statuses = array();
 
   $statuses['active'] = array(
-    'label' => t('Active'),
+    'label' => 'Active',
     'weight' => -10,
   );
 
   $statuses['private'] = array(
-    'label' => t('Private'),
+    'label' => 'Private',
     'visible' => FALSE,
     'weight' => -5,
   );
 
   $statuses['deprecated'] = array(
-    'label' => t('Deprecated'),
+    'label' => 'Deprecated',
     'visible' => FALSE,
     'creatable' => FALSE,
     'weight' => 0,
   );
 
   $statuses['inactive'] = array(
-    'label' => t('Inactive'),
+    'label' => 'Inactive',
     'import' => FALSE,
     'visible' => FALSE,
     'creatable' => FALSE,
