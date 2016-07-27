@@ -124,7 +124,7 @@ function theme_patternbuilder_pattern_statuses($vars) {
   foreach ($vars['statuses'] as $status_key => $status) {
     $status_row = array();
     $status_row[] = t('@label (@name)', array(
-      '@label' => $status['label'],
+      '@label' => t($status['label']),
       '@name' => $status_key,
     ));
     $status_row[] = check_plain($status['module']);

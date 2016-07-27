@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Module for loading and parsing json schema files.
@@ -928,7 +929,6 @@ function patternbuilder_component_save(&$component) {
   return $updated_component;
 }
 
-
 /**
  * Returns an array of some or all of the order statuses keyed by name.
  *
@@ -1056,12 +1056,12 @@ function patternbuilder_pattern_status_get_label($name = NULL) {
 
   // Return a status title if specified and it exists.
   if (!empty($name)) {
-    return isset($statuses[$name]['label']) ? $statuses[$name]['label'] : NULL;
+    return isset($statuses[$name]['label']) ? t($statuses[$name]['label']) : NULL;
   }
 
   // Otherwise turn the array values into the status title only.
   foreach ($statuses as $key => $status) {
-    $statuses[$key] = $status['label'];
+    $statuses[$key] = t($status['label']);
   }
 
   return $statuses;
@@ -1076,7 +1076,7 @@ function patternbuilder_pattern_status_get_label($name = NULL) {
 function patternbuilder_pattern_status_options_list() {
   $options = array();
   foreach (patternbuilder_pattern_statuses() as $name => $status) {
-    $options[$name] = check_plain($status['label']);
+    $options[$name] = check_plain(t($status['label']));
   }
 
   return $options;

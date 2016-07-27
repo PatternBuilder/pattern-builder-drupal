@@ -14,7 +14,7 @@ function hook_patternbuilder_pattern_types() {
   return array(
     // Key = pattern type machine name.
     'pattern' => array(
-      // Human readable label for this pattern type.
+      // Un-translated human readable label for this pattern type.
       'label' => 'Pattern',
       // Define a prefix for the bundle or field name. Default is "pbi".
       'prefix' => 'mymod',
