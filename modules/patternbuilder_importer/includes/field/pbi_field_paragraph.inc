@@ -26,6 +26,77 @@ class pbi_field_paragraph extends pbi_field {
   /**
    * {@inheritdoc}
    */
+  public static function settings_defaults() {
+    $defaults = array(
+      'instance__title' => 'Pattern',
+      'instance__title_multiple' => 'Patterns',
+      'instance__default_edit_mode' => 'closed',
+    );
+
+    $defaults += parent::settings_defaults();
+    return $defaults;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function settings_form() {
+    $form = parent::settings_form();
+    $storage_id = static::settings_storage_id();
+    $settings = static::settings_values();
+    $classname = get_called_class();
+
+    // Extract the form from the paragraphs instance form.
+    $instance_form = array();
+    $handler_instance_settings = static::handler_instance_settings();
+    if ($handler_instance_settings) {
+      $fake_field = array();
+      $fake_instance = array('settings' => $handler_instance_settings);
+      $paragraphs_instance_form = module_invoke('paragraphs', 'field_instance_settings_form', $fake_field, $fake_instance);
+      if ($paragraphs_instance_form) {
+        // Cleanup un-used elements.
+        unset($paragraphs_instance_form['fieldset']);
+        unset($paragraphs_instance_form['allowed_bundles_table']);
+
+        // Re-key the form.
+        foreach (element_children($paragraphs_instance_form) as $instance_setting_name) {
+          $new_setting_name = 'instance__' . $instance_setting_name;
+          $instance_form[$new_setting_name] = $paragraphs_instance_form[$instance_setting_name];
+          if (isset($paragraphs_instance_form[$instance_setting_name]['#states'])) {
+            $states = $paragraphs_instance_form[$instance_setting_name]['#states'];
+            foreach ($states as $state => $state_conditions) {
+              $new_state_conditions = array();
+              foreach ($state_conditions as $state_condition_selector => $state_condition) {
+                $new_state_condition_selector = preg_replace('@instance\[settings\]\[([^\]]+)\]@', $storage_id . '[instance__$1]', $state_condition_selector);
+                $new_state_conditions[$new_state_condition_selector] = $state_condition;
+              }
+              $states[$state] = $new_state_conditions;
+            }
+            unset($state_conditions);
+
+            $instance_form[$new_setting_name]['#states'] = $states;
+          }
+        }
+      }
+    }
+
+    if ($instance_form) {
+      $form[$storage_id] = array(
+        '#type' => 'fieldset',
+        '#title' => $classname,
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#tree' => TRUE,
+      );
+      $form[$storage_id] += $instance_form;
+    }
+
+    return $form;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function determine_field_widget($property, array $base, array $instance) {
     return array('type' => 'patternbuilder_paragraphs_embed');
   }
@@ -38,6 +109,28 @@ class pbi_field_paragraph extends pbi_field {
     if (empty($formatter)) {
       $formatter = array(
         'type' => 'patternbuilder_view',
+        'label' => 'hidden',
+        'settings' => array(
+          'view_mode' => 'full',
+        ),
+      );
+    }
+
+    return $formatter;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function determine_preview_field_formatter($property, array $base, array $instance) {
+    $formatter = parent::determine_preview_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      $formatter = array(
+        'type' => 'paragraphs_view',
+        'label' => 'hidden',
+        'settings' => array(
+          'view_mode' => 'paragraphs_editor_preview',
+        ),
       );
     }
 
@@ -49,11 +142,6 @@ class pbi_field_paragraph extends pbi_field {
    */
   protected function preprocess_field($name, $property, array $required_properties, $weight) {
     $field = parent::preprocess_field($name, $property, $required_properties, $weight);
-
-    // Default settings.
-    $field['instance']['settings']['title'] = variable_get('patternbuilder_default_paragraphs_item_title', 'Pattern');
-    $field['instance']['settings']['title_multiple'] = variable_get('patternbuilder_default_paragraphs_item_title_plural', 'Patterns');
-    $field['instance']['settings']['default_edit_mode'] = variable_get('patternbuilder_default_paragraphs_item_edit_mode', 'closed');
 
     // Set allowed schemas.
     if (!empty($field['instance'])) {
@@ -72,8 +160,8 @@ class pbi_field_paragraph extends pbi_field {
       }
 
       if (isset($items)) {
-        $settings = $this->build_paragraphs_bundle_settings($items, $field);
-        $field['instance']['settings'] = array_merge($field['instance']['settings'], $settings);
+        $bundle_settings = $this->build_paragraphs_bundle_settings($items, $field);
+        $field['instance']['settings'] = array_merge($field['instance']['settings'], $bundle_settings);
       }
     }
 
@@ -96,7 +184,7 @@ class pbi_field_paragraph extends pbi_field {
    */
   private function build_paragraphs_bundle_settings(array $items, array $import = array()) {
     $bundle_weight = 0;
-    $settings = array();
+    $bundle_settings = array();
 
     foreach ($items as $ref_comp) {
       $machine_name = patternbuilder_clean_schema_machine_name($ref_comp->{'$ref'});
@@ -129,12 +217,12 @@ class pbi_field_paragraph extends pbi_field {
         }
 
         // Update widget settings.
-        $settings['allowed_bundles'][$bundle_name] = $bundle_name;
-        $settings['bundle_weights'][$bundle_name] = $bundle_weight++;
+        $bundle_settings['allowed_bundles'][$bundle_name] = $bundle_name;
+        $bundle_settings['bundle_weights'][$bundle_name] = $bundle_weight++;
       }
     }
 
-    return $settings;
+    return $bundle_settings;
   }
 
 }

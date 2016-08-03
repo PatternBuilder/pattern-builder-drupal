@@ -14,6 +14,8 @@ function patternbuilder_importer_hook_info() {
     'patternbuilder_importer_field_instance_settings_alter' => $base_info,
     'patternbuilder_importer_property_formatter' => $base_info,
     'patternbuilder_importer_property_formatter_alter' => $base_info,
+    'patternbuilder_importer_property_preview_formatter' => $base_info,
+    'patternbuilder_importer_property_preview_formatter_alter' => $base_info,
     'patternbuilder_importer_property_default_value_alter' => $base_info,
     'patternbuilder_importer_field_import_alter' => $base_info,
   );
@@ -610,7 +612,7 @@ function patternbuilder_importer_create_factory($id, $bundle_name, &$weight, $en
 /**
  * Retrieves the default formatter for a given schema property.
  *
- * This is used by the importer to determine a fields default formatter.
+ * This is used by the importer to determine a field's default formatter.
  *
  * @param object $property
  *   The full property object.
@@ -630,7 +632,7 @@ function patternbuilder_importer_get_property_default_formatter($property, array
 /**
  * Retrieves all available formatters for a given schema property.
  *
- * This is used by the importer to determine a fields formatter.
+ * This is used by the importer to determine a field's formatter.
  *
  * @param object $property
  *   The full property object.
@@ -667,6 +669,85 @@ function patternbuilder_importer_available_property_formatters($property, array 
   $formatters = array();
   if ($formatters_unordered) {
     drupal_alter('patternbuilder_importer_property_formatter', $formatters_unordered, $context);
+
+    $pb_weights = array();
+    foreach ($formatters_unordered as $index => $formatter) {
+      $pb_weights[$index] = isset($formatter['pb_weight']) ? $formatter['pb_weight'] : 0;
+    }
+
+    asort($pb_weights);
+    foreach ($pb_weights as $index => $weight) {
+      $formatters[$index] = $formatters_unordered[$index];
+
+      // Remove custom properties.
+      unset($formatters[$index]['pb_weight']);
+      unset($formatters[$index]['pb_module']);
+    }
+  }
+
+  return $formatters;
+}
+
+/**
+ * Retrieves the preview formatter for a given schema property.
+ *
+ * This is used by the importer to determine a field's preview formatter.
+ *
+ * @param object $property
+ *   The full property object.
+ * @param array $field_base
+ *   The built field base array.
+ * @param array $field_instance
+ *   The built field instance array.
+ *
+ * @return array
+ *   A single formatter array for a Drupal field display.
+ */
+function patternbuilder_importer_get_property_preview_formatter($property, array $field_base, array $field_instance) {
+  $formatters = patternbuilder_importer_available_property_preview_formatters($property, $field_base, $field_instance);
+  return $formatters ? reset($formatters) : array();
+}
+
+/**
+ * Retrieves all available preview formatters for a given schema property.
+ *
+ * This is used by the importer to determine a field's preview formatter.
+ *
+ * @param object $property
+ *   The full property object.
+ * @param array $field_base
+ *   The built field base array.
+ * @param array $field_instance
+ *   The built field instance array.
+ *
+ * @return array
+ *   An array of formatters sorted by weight.
+ */
+function patternbuilder_importer_available_property_preview_formatters($property, array $field_base, array $field_instance) {
+  $formatters_unordered = array();
+  $context = array(
+    'property' => $property,
+    'field_base' => $field_base,
+    'field_instance' => $field_instance,
+  );
+
+  foreach (module_implements('patternbuilder_importer_property_preview_formatter') as $module) {
+    $module_formatters = module_invoke($module, 'patternbuilder_importer_property_preview_formatter', $context);
+    if (empty($module_formatters)) {
+      continue;
+    }
+    foreach ($module_formatters as $index => $formatter_info) {
+      if (isset($formatter_info['type'])) {
+        $formatter = $formatter_info;
+        $formatter['pb_module'] = $module;
+        $formatters_unordered["{$module}::{$index}"] = $formatter;
+      }
+    }
+  }
+
+  $formatters = array();
+  if ($formatters_unordered) {
+    drupal_alter('patternbuilder_importer_property_preview_formatter', $formatters_unordered, $context);
 
     $pb_weights = array();
     foreach ($formatters_unordered as $index => $formatter) {
