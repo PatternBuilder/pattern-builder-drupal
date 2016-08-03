@@ -318,7 +318,7 @@ function patternbuilder_importer_file_get_schema_object($jsonschema_file, $reset
       $error_message = 'The schema file is empty: "@file".';
     }
     elseif (!($object = json_decode($file_contents))) {
-      $error_message = 'The schema file could not be decoded: "@file". This is usually caused by malformed JSON in the schema file.';
+      $error_message = 'The schema file could not be decoded: "@file". The most common cause of this error is malformed JSON in the schema file.';
     }
 
     if (!empty($object)) {

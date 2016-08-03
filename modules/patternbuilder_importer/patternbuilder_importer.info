@@ -13,7 +13,6 @@ files[] = includes/field/pbi_field_ref.inc
 files[] = includes/field/pbi_field_link.inc
 files[] = includes/field/pbi_field_paragraph.inc
 files[] = includes/field/pbi_field_collection.inc
-files[] = includes/field/pbi_field_entity_interface.inc
 files[] = includes/field/pbi_field_entity_abstract.inc
 files[] = includes/field/media/pbi_field_media.inc
 files[] = includes/field/media/pbi_field_image.inc
