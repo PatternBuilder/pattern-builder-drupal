@@ -155,7 +155,8 @@ class pbi_field implements pbi_field_interface {
    * Extracts settings with a given prefix.
    *
    * @param string $prefix
-   *  The prefix to find.
+   *   The prefix to find.
+   *
    * @return array
    *   An array of values keyed by the field instance settings name.
    */
