@@ -513,14 +513,39 @@ class pbi_field implements pbi_field_interface {
         $text_field_types = array('text', 'text_long', 'text_with_summary');
         if (in_array($base['type'], $text_field_types, TRUE)) {
           $settings = static::settings_values();
-          $formatter = array(
-            'type' => $base['type'] === 'text_with_summary' ? 'text_summary_or_trimmed' : 'text_trimmed',
-            'label' => 'hidden',
-            'settings' => array(
-              'trim_length' => $settings['text_preview_trim_length'],
-            ),
-            'weight' => 1,
-          );
+          // Provide some sane defaults.
+          if (module_exists('smart_trim')) {
+            $formatter = array(
+              'type' => 'smart_trim_format',
+              'label' => 'hidden',
+              'module' => 'smart_trim',
+              'weight' => 1,
+              'settings' => array(
+                'more_link' => 0,
+                'more_text' => 'Read more',
+                'summary_handler' => 'trim',
+                'trim_type' => 'chars',
+                'trim_length' => $settings['text_preview_trim_length'],
+                'trim_link' => 0,
+                'trim_preserve_tags' => '',
+                'trim_suffix' => '',
+                'trim_options' => array(
+                  'smart_boundaries' => 'smart_boundaries',
+                  'text' => 'text',
+                ),
+              ),
+            );
+          }
+          else {
+            $formatter = array(
+              'type' => $base['type'] === 'text_with_summary' ? 'text_summary_or_trimmed' : 'text_trimmed',
+              'label' => 'hidden',
+              'weight' => 1,
+              'settings' => array(
+                'trim_length' => $settings['text_preview_trim_length'],
+              ),
+            );
+          }
         }
       }
 
