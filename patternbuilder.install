@@ -155,9 +155,17 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
 
   // Get type info with defaults.
   $field_type_new_info = field_info_field_types($field_type_new);
-  if (!empty($field_type_new_info['settings'])) {
+  if (isset($field_type_new_info['settings'])) {
     if (!empty($field['settings'])) {
       $field['settings'] += $field_type_new_info['settings'];
+      // Cleanup field settings from old field.
+      if ($field['settings']) {
+        foreach (array_keys($field['settings']) as $field_setting_key) {
+          if (!array_key_exists($field_setting_key, $field_type_new_info['settings'])) {
+            unset($field['settings'][$field_setting_key]);
+          }
+        }
+      }
     }
     else {
       $field['settings'] = $field_type_new_info['settings'];
