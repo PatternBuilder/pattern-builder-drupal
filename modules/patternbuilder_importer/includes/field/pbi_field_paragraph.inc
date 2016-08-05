@@ -31,6 +31,7 @@ class pbi_field_paragraph extends pbi_field {
       'instance__title' => 'Pattern',
       'instance__title_multiple' => 'Patterns',
       'instance__default_edit_mode' => 'closed',
+      'widget__type' => 'patternbuilder_paragraphs_embed',
     );
 
     $defaults += parent::settings_defaults();
@@ -45,6 +46,7 @@ class pbi_field_paragraph extends pbi_field {
     $storage_id = static::settings_storage_id();
     $settings = static::settings_values();
     $classname = get_called_class();
+    $field_type = static::global_field_type();
 
     // Extract the form from the paragraphs instance form.
     $instance_form = array();
@@ -52,7 +54,7 @@ class pbi_field_paragraph extends pbi_field {
     if ($handler_instance_settings) {
       $fake_field = array();
       $fake_instance = array('settings' => $handler_instance_settings);
-      $paragraphs_instance_form = module_invoke('paragraphs', 'field_instance_settings_form', $fake_field, $fake_instance);
+      $paragraphs_instance_form = module_invoke($field_type, 'field_instance_settings_form', $fake_field, $fake_instance);
       if ($paragraphs_instance_form) {
         // Cleanup un-used elements.
         unset($paragraphs_instance_form['fieldset']);
@@ -80,25 +82,36 @@ class pbi_field_paragraph extends pbi_field {
       }
     }
 
-    if ($instance_form) {
+    $widget_form = array();
+    $widget_settings = static::handler_widget_settings();
+    if (isset($widget_settings['type'])) {
+      $widget_type_options = static::field_widget_type_options($field_type);
+      if ($widget_type_options) {
+        $widget_form['widget__type'] = array(
+          '#type' => 'select',
+          '#title' => t('Widget type'),
+          '#required' => TRUE,
+          '#options' => $widget_type_options,
+          '#default_value' => $widget_settings['type'],
+          '#description' => t('The type of form element you would like to present to the user when creating this field.'),
+        );
+      }
+    }
+
+    if ($instance_form || $widget_form) {
       $form[$storage_id] = array(
         '#type' => 'fieldset',
         '#title' => $classname,
+        '#description' => t('Settings for paragraph fields within a pattern.'),
         '#collapsible' => TRUE,
         '#collapsed' => TRUE,
         '#tree' => TRUE,
       );
       $form[$storage_id] += $instance_form;
+      $form[$storage_id] += $widget_form;
     }
 
     return $form;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function determine_field_widget($property, array $base, array $instance) {
-    return array('type' => 'patternbuilder_paragraphs_embed');
   }
 
   /**

@@ -76,6 +76,31 @@ class pbi_field implements pbi_field_interface {
   }
 
   /**
+   * Wrapper of field_ui_widget_type_options().
+   *
+   * Provides widget options without requiring the field_ui module.
+   *
+   * @param string $field_type
+   *   The field type.
+   *
+   * @return array
+   *   An array of widget options keyed by type.
+   */
+  public static function field_widget_type_options($field_type) {
+    $options = array();
+    $field_type_info = field_info_field_types($field_type);
+    if (!empty($field_type_info)) {
+      foreach (field_info_widget_types() as $name => $widget_type) {
+        if (in_array($field_type, $widget_type['field types'], TRUE)) {
+          $options[$name] = $widget_type['label'];
+        }
+      }
+    }
+
+    return $options;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function settings_values() {
@@ -127,22 +152,35 @@ class pbi_field implements pbi_field_interface {
   }
 
   /**
+   * Extracts settings with a given prefix.
+   *
+   * @param string $prefix
+   *  The prefix to find.
+   * @return array
+   *   An array of values keyed by the field instance settings name.
+   */
+  public static function handler_extract_settings($prefix) {
+    $prefix_len = drupal_strlen($prefix);
+    $extracted_settings = array();
+    $settings = static::settings_values();
+    foreach ($settings as $setting_name => $setting_value) {
+      if (strpos($setting_name, $prefix) === 0) {
+        $extracted_setting_name = substr($setting_name, $prefix_len);
+        $extracted_settings[$extracted_setting_name] = $setting_value;
+      }
+    }
+
+    return $extracted_settings;
+  }
+
+  /**
    * Extracts field settings from the handler settings.
    *
    * @return array
    *   An array of values keyed by the field settings name.
    */
   public static function handler_field_settings() {
-    $instance_settings = array();
-    $settings = static::settings_values();
-    foreach ($settings as $setting_name => $setting_value) {
-      if (strpos($setting_name, 'field__') === 0) {
-        $instance_setting_name = substr($setting_name, 10);
-        $instance_settings[$instance_setting_name] = $setting_value;
-      }
-    }
-
-    return $instance_settings;
+    return static::handler_extract_settings('field__');
   }
 
   /**
@@ -152,16 +190,17 @@ class pbi_field implements pbi_field_interface {
    *   An array of values keyed by the field instance settings name.
    */
   public static function handler_instance_settings() {
-    $instance_settings = array();
-    $settings = static::settings_values();
-    foreach ($settings as $setting_name => $setting_value) {
-      if (strpos($setting_name, 'instance__') === 0) {
-        $instance_setting_name = substr($setting_name, 10);
-        $instance_settings[$instance_setting_name] = $setting_value;
-      }
-    }
+    return static::handler_extract_settings('instance__');
+  }
 
-    return $instance_settings;
+  /**
+   * Extracts widget settings from the handler settings.
+   *
+   * @return array
+   *   An array of values keyed by the field widget settings name.
+   */
+  public static function handler_widget_settings() {
+    return static::handler_extract_settings('widget__');
   }
 
   /**
@@ -600,6 +639,17 @@ class pbi_field implements pbi_field_interface {
   protected function determine_field_widget($property, array $base, array $instance) {
     $widget = array();
 
+    // Set to handler widget settings to override defaults.
+    $handler_settings = static::handler_widget_settings();
+    if (!empty($handler_settings)) {
+      $widget = $handler_settings;
+
+      // Return if the type is defined.
+      if (!empty($widget['type'])) {
+        return $widget;
+      }
+    }
+
     switch ($base['type']) {
       case 'list_boolean':
         $widget['type'] = 'options_onoff';
@@ -716,7 +766,7 @@ class pbi_field implements pbi_field_interface {
     );
 
     // Initialize field settings with handler settings.
-    $handler_field_settings = static::handler_instance_settings();
+    $handler_field_settings = static::handler_field_settings();
     if ($handler_field_settings) {
       $base['settings'] = $handler_field_settings;
     }
