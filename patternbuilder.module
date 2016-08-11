@@ -1644,7 +1644,7 @@ function patternbuilder_field_widget_settings_form($field, $instance) {
 
     $form['alpha_sort'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Always sort bundles alphabetically'),
+      '#title' => t('Sort bundles alphabetically'),
       '#description' => t('If enabled, then the bundles are sorted alphabetically by bundle label regardless of any manual ordering in the "Allowed Paragraph bundles".  The pattern bundles are sorted first followed by the non-pattern bundles.'),
       '#default_value' => $settings['alpha_sort'],
     );
