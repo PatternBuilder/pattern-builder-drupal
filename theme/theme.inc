@@ -42,8 +42,10 @@ function template_preprocess_patternbuilder_item(&$vars) {
   $vars['entity'] = $entity;
 
   $entity_info = entity_get_info($entity_type);
-  list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+  list($entity_id, $revision_id , $bundle) = entity_extract_ids($entity_type, $entity);
   $vars['bundle'] = $bundle;
+  $vars['entity_id'] = $entity_id;
+  $vars['revision_id'] = $revision_id;
   $vars['pattern_component'] = patternbuilder_get_bundle_component($bundle);
 
   $view_mode = 'full';
@@ -55,10 +57,12 @@ function template_preprocess_patternbuilder_item(&$vars) {
   // Build the content.
   if (!empty($vars['pattern_component'])) {
     // Patterns.
+    $vars['is_pattern'] = TRUE;
     $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
   }
   else {
     // Non-patterns.
+    $vars['is_pattern'] = FALSE;
     $vars['content'] = $entity->view($view_mode);
   }
 
@@ -67,8 +71,8 @@ function template_preprocess_patternbuilder_item(&$vars) {
 
   // Add theme suggestions.
   $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $bundle;
-  if ($id = entity_id($entity_type, $entity)) {
-    $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $id;
+  if ($entity_id) {
+    $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $entity_id;
   }
 }
 
