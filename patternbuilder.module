@@ -135,6 +135,7 @@ function patternbuilder_invalidate_cache() {
   patternbuilder_pattern_statuses_reset();
 
   drupal_static_reset('patternbuilder_components_load');
+  drupal_static_reset('patternbuilder_components_load__bundles');
 
   drupal_static_reset('patternbuilder_get_resolver');
 }
@@ -618,9 +619,11 @@ function _patternbuilder_component_ids_load() {
  */
 function patternbuilder_components_load($machine_name = NULL, $rebuild = FALSE) {
   $cache = &drupal_static(__FUNCTION__);
+  $bundle_cache = &drupal_static(__FUNCTION__ . '__bundles');
 
   if ($rebuild || !isset($cache)) {
     $cache = array();
+    $bundle_cache = array();
     $records = db_select('patternbuilder_components', 'c')
       ->fields('c')
       ->orderBy('c.id', 'ASC')
@@ -635,8 +638,15 @@ function patternbuilder_components_load($machine_name = NULL, $rebuild = FALSE) 
         if (empty($record->status)) {
           $record->status = $default_status_name;
         }
+
+        // Build component cache.
+        $cache[$k] = $record;
+
+        // Build bundle cache.
+        if (!empty($record->bundle_name) && !isset($bundle_cache[$record->bundle_name])) {
+          $bundle_cache[$record->bundle_name] = &$cache[$k];
+        }
       }
-      $cache = $records;
     }
   }
 
@@ -645,6 +655,18 @@ function patternbuilder_components_load($machine_name = NULL, $rebuild = FALSE) 
   }
 
   return $cache;
+}
+
+/**
+ * Returns the pattern component for all bundles.
+ *
+ * @return array
+ *   An array of pattern component objects keyed by bundle name.
+ */
+function patternbuilder_get_bundle_component_map() {
+  patternbuilder_components_load();
+  $bundle_components = drupal_static('patternbuilder_components_load__bundles', array());
+  return $bundle_components ? $bundle_components : array();
 }
 
 /**
@@ -657,30 +679,8 @@ function patternbuilder_components_load($machine_name = NULL, $rebuild = FALSE) 
  *   The pattern component object corresponding to the bundle.
  */
 function patternbuilder_get_bundle_component($bundle_name) {
-  $components = patternbuilder_components_load();
-  foreach ($components as $machine_name => $component) {
-    if (!empty($component->bundle_name) && $component->bundle_name == $bundle_name) {
-      return $component;
-    }
-  }
-}
-
-/**
- * Returns the pattern component for all bundles.
- *
- * @return array
- *   An array of pattern component objects keyed by bundle name.
- */
-function patternbuilder_get_bundle_component_map() {
-  $return = array();
-  $components = patternbuilder_components_load();
-  foreach ($components as $machine_name => $component) {
-    if (!empty($component->bundle_name)) {
-      $return[$component->bundle_name] = $component;
-    }
-  }
-
-  return $return;
+  $bundle_components = patternbuilder_get_bundle_component_map();
+  return isset($bundle_components[$bundle_name]) ? $bundle_components[$bundle_name] : NULL;
 }
 
 /**
@@ -1703,6 +1703,7 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
 
   // Set allowed bundles to the allowed patterns.
   $available_bundles = paragraphs_bundle_load();
+  $bundles_sorted = FALSE;
 
   // Alpha sort the available bundle names. This will be used to set the final
   // order for patterns and non-patterns.
@@ -1714,8 +1715,7 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
 
     uasort($bundle_labels, 'strnatcasecmp');
     $available_bundle_names = array_keys($bundle_labels);
-    // Override the bundle weights for the paragraphs widget to build correctly.
-    $instance['settings']['bundle_weights'] = array_combine($available_bundle_names, array_keys($available_bundle_names));
+    $bundles_sorted = TRUE;
   }
   else {
     $available_bundle_names = array_keys($available_bundles);
@@ -1801,6 +1801,11 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
   // Override instance settings for the paragraphs widget to build correctly.
   // The allowed bundles is keyed by bundle name with values of bundle name.
   $instance['settings']['allowed_bundles'] = array_combine($bundles_allowed, $bundles_allowed);
+
+  // Override the bundle weights if the bundles were sorted.
+  if ($bundles_sorted) {
+    $instance['settings']['bundle_weights'] = array_combine($bundles_allowed, range(0, count($bundles_allowed) - 1, 1));
+  }
 
   // Build form elements.
   module_load_include('inc', 'paragraphs', 'paragraphs.field_widget');
@@ -1926,9 +1931,10 @@ function patternbuilder_field_formatter_view($entity_type, $entity, $field, $ins
 
   switch ($display['type']) {
     case 'patternbuilder_view':
+      // Note: Recursion checks similar to the entity reference field is not
+      // needed since this formatter is limited to the "paragraphs" field type
+      // which does not support referencing existing paragraph entities.
       $paragraph_info = entity_get_info('paragraphs_item');
-
-      // @todo: Recursion check like entity reference field.
 
       // Set the items theme.
       $element['#theme_wrappers'] = array();
