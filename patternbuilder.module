@@ -1600,6 +1600,8 @@ function patternbuilder_field_widget_info() {
       'field types' => array('paragraphs'),
       'settings' => array(
         'allowed_pattern_types' => array(),
+        'allow_non_patterns' => FALSE,
+        'alpha_sort' => TRUE,
       ),
       'behaviors' => array(
         'multiple values' => FIELD_BEHAVIOR_CUSTOM,
@@ -1631,6 +1633,20 @@ function patternbuilder_field_widget_settings_form($field, $instance) {
       '#description' => t('If no pattern type is selected, then all pattern types will be available.'),
       '#default_value' => $settings['allowed_pattern_types'],
       '#options' => $pattern_type_options,
+    );
+
+    $form['allow_non_patterns'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Allow Non-Pattern paragraph bundles'),
+      '#description' => t('If enabled, then explicitly selected non-pattern paragraph bundles will be available in the pattern selection. The non-pattern bundles ca be selected in the "Allowed Paragraph bundles".'),
+      '#default_value' => $settings['allow_non_patterns'],
+    );
+
+    $form['alpha_sort'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Always sort bundles alphabetically'),
+      '#description' => t('If enabled, then the bundles are sorted alphabetically by bundle label regardless of any manual ordering in the "Allowed Paragraph bundles".  The pattern bundles are sorted first followed by the non-pattern bundles.'),
+      '#default_value' => $settings['alpha_sort'],
     );
   }
 
@@ -1676,6 +1692,7 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
 
   // Get some pattern info.
   $components = patternbuilder_components_load();
+  $bundle_components = patternbuilder_get_bundle_component_map();
   $available_pattern_type_bundles = patternbuilder_components_get_pattern_type_bundles();
   $invisible_statuses = patternbuilder_pattern_statuses(array(
     'visible' => FALSE,
@@ -1686,22 +1703,46 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
 
   // Set allowed bundles to the allowed patterns.
   $available_bundles = paragraphs_bundle_load();
-  $available_bundle_names = array_keys($available_bundles);
 
-  // Build instance allowed bundles per the field settings.
-  $instance_allowed_bundles = array();
+  // Alpha sort the available bundle names. This will be used to set the final
+  // order for patterns and non-patterns.
+  if (!empty($settings['alpha_sort'])) {
+    $bundle_labels = array();
+    foreach ($available_bundles as $bundle_name => $bundle_info) {
+      $bundle_labels[$bundle_name] = isset($bundle_info->name) ? $bundle_info->name : $bundle_name;
+    }
+
+    uasort($bundle_labels, 'strnatcasecmp');
+    $available_bundle_names = array_keys($bundle_labels);
+    // Override the bundle weights for the paragraphs widget to build correctly.
+    $instance['settings']['bundle_weights'] = array_combine($available_bundle_names, array_keys($available_bundle_names));
+  }
+  else {
+    $available_bundle_names = array_keys($available_bundles);
+  }
+
+  $available_bundle_names = array_combine($available_bundle_names, $available_bundle_names);
+
+  // Build instance allowed bundles per the field instance settings.
+  $instance_bundles_allowed = array();
   if (!empty($instance['settings']['allowed_bundles'])) {
     foreach ($instance['settings']['allowed_bundles'] as $bundle_setting_key => $bundle_setting_value) {
       if ($bundle_setting_key === $bundle_setting_value && isset($available_bundles[$bundle_setting_key])) {
-        $instance_allowed_bundles[$bundle_setting_key] = $bundle_setting_key;
+        $instance_bundles_allowed[$bundle_setting_key] = $bundle_setting_key;
       }
     }
   }
 
-  // Set to all bundles if none explicitly defined.
-  $has_unlimited_bundles = empty($instance_allowed_bundles);
-  if ($has_unlimited_bundles) {
-    $instance_allowed_bundles = $available_bundle_names;
+  // Split bundles allowed into patterns and non-patterns.
+  $instance_patterns_allowed = array();
+  $instance_non_patterns_allowed = array();
+  if (!empty($instance_bundles_allowed)) {
+    $instance_patterns_allowed = array_intersect_key($instance_bundles_allowed, $bundle_components);
+
+    // Set allowed non-patterns if widget setting is enabled.
+    if (!empty($settings['allow_non_patterns'])) {
+      $instance_non_patterns_allowed = array_diff_key($instance_bundles_allowed, $bundle_components);
+    }
   }
 
   // Pattern type allowed bundles.
@@ -1714,34 +1755,52 @@ function patternbuilder_paragraphs_field_multiple_value_form($field, $instance, 
     $pattern_types_allowed = array_keys($available_pattern_type_bundles);
   }
 
-  $pattern_allowed_bundles = array();
+  // Build allowed patterns based on the pattern types.
+  $patterns_allowed_by_type = array();
   foreach ($pattern_types_allowed as $allowed_pattern_type) {
     if (isset($available_pattern_type_bundles[$allowed_pattern_type])) {
-      $pattern_allowed_bundles += $available_pattern_type_bundles[$allowed_pattern_type];
+      $patterns_allowed_by_type += $available_pattern_type_bundles[$allowed_pattern_type];
     }
   }
 
+  // Set to all patterns if no pattern is explicitly selected.
+  $has_unlimited_patterns = empty($instance_patterns_allowed) && !empty($patterns_allowed_by_type);
+  if ($has_unlimited_patterns) {
+    $instance_patterns_allowed = $patterns_allowed_by_type;
+  }
+
   // Build allowed bundles.
-  $allowed_bundles = array_intersect($pattern_allowed_bundles, $instance_allowed_bundles, $available_bundle_names);
+  $patterns_allowed = array_intersect($patterns_allowed_by_type, $instance_patterns_allowed);
 
   // Remove non-visible and non-creatable patterns.
-  if ($has_unlimited_bundles && $invisible_statuses) {
-    foreach (array_keys($allowed_bundles) as $machine_name) {
+  if ($has_unlimited_patterns && $invisible_statuses) {
+    foreach (array_keys($patterns_allowed) as $machine_name) {
       if (isset($components[$machine_name]->status) && isset($invisible_statuses[$components[$machine_name]->status])) {
-        unset($allowed_bundles[$machine_name]);
+        unset($patterns_allowed[$machine_name]);
       }
     }
   }
 
   // Remove non-creatable patterns.
-  foreach (array_keys($allowed_bundles) as $machine_name) {
+  foreach (array_keys($patterns_allowed) as $machine_name) {
     if (isset($components[$machine_name]->status) && isset($non_creatable_statuses[$components[$machine_name]->status])) {
-      unset($allowed_bundles[$machine_name]);
+      unset($patterns_allowed[$machine_name]);
     }
   }
 
-  // Override instance settings.
-  $instance['settings']['allowed_bundles'] = array_combine($allowed_bundles, $allowed_bundles);
+  // Build the allowed bundles.
+  $bundles_allowed = array_intersect($available_bundle_names, array_values($patterns_allowed));
+  if (!empty($instance_non_patterns_allowed)) {
+    $non_patterns_sorted = array_intersect($available_bundle_names, array_values($instance_non_patterns_allowed));
+    $bundles_allowed = array_merge($bundles_allowed, $non_patterns_sorted);
+  }
+
+  // Ensure this is a unique list of available bundles.
+  $bundles_allowed = array_unique($bundles_allowed);
+
+  // Override instance settings for the paragraphs widget to build correctly.
+  // The allowed bundles is keyed by bundle name with values of bundle name.
+  $instance['settings']['allowed_bundles'] = array_combine($bundles_allowed, $bundles_allowed);
 
   // Build form elements.
   module_load_include('inc', 'paragraphs', 'paragraphs.field_widget');
