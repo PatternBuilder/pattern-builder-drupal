@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Default theme functions for paragraphs.
@@ -31,17 +32,19 @@ function template_preprocess_patternbuilder_item(&$vars) {
   if (isset($vars['elements']['#entity_type']) && $vars['elements']['#entity_type'] != 'paragraphs_item') {
     return;
   }
-  $entity_type = 'paragraphs_item';
+  $entity_type = $vars['elements']['#entity_type'];
   $vars['entity_type'] = $entity_type;
 
   $langcode = !empty($vars['elements']['#language']) ? $vars['elements']['#language'] : LANGUAGE_NONE;
   $vars['language'] = $langcode;
 
   $entity = $vars['elements']['#entity'];
-  $vars[$vars['elements']['#entity_type']] = $entity;
+  $vars['entity'] = $entity;
 
   $entity_info = entity_get_info($entity_type);
   list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+  $vars['bundle'] = $bundle;
+  $vars['pattern_component'] = patternbuilder_get_bundle_component($bundle);
 
   $view_mode = 'full';
   if (!empty($vars['elements']['#view_mode']) && isset($entity_info['view modes'][$vars['elements']['#view_mode']])) {
@@ -49,8 +52,15 @@ function template_preprocess_patternbuilder_item(&$vars) {
   }
   $vars['view_mode'] = $view_mode;
 
-  // Helpful $content variable for templates.
-  $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
+  // Build the content.
+  if (!empty($vars['pattern_component'])) {
+    // Patterns.
+    $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
+  }
+  else {
+    // Non-patterns.
+    $vars['content'] = $entity->view($view_mode);
+  }
 
   // Build css classes.
   $vars['classes_array'][] = drupal_html_class('patternbuilder-item--' . $bundle);
