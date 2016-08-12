@@ -6,7 +6,7 @@
  */
 
 /**
- * Process variables for paragraphs-items.tpl.php.
+ * Process variables for patternbuilder-items.tpl.php.
  */
 function template_preprocess_patternbuilder_items(&$vars) {
   $vars['view_mode'] = $vars['element']['#view_mode'];
@@ -26,7 +26,7 @@ function template_preprocess_patternbuilder_items(&$vars) {
 }
 
 /**
- * Process variables for paragraphs-item.tpl.php.
+ * Process variables for patternbuilder-item.tpl.php.
  */
 function template_preprocess_patternbuilder_item(&$vars) {
   if (isset($vars['elements']['#entity_type']) && $vars['elements']['#entity_type'] != 'paragraphs_item') {
