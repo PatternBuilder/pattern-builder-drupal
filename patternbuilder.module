@@ -1931,7 +1931,7 @@ function patternbuilder_field_formatter_view($entity_type, $entity, $field, $ins
 
   switch ($display['type']) {
     case 'patternbuilder_view':
-      // Note: Recursion checks similar to the entity reference field is not
+      // Note: Recursion check similar to the entity reference field is not
       // needed since this formatter is limited to the "paragraphs" field type
       // which does not support referencing existing paragraph entities.
       $paragraph_info = entity_get_info('paragraphs_item');
