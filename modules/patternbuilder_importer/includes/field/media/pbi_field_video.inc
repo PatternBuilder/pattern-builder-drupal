@@ -19,7 +19,7 @@ class pbi_field_video extends pbi_field_media {
   /**
    * {@inheritdoc}
    */
-  protected static function field_property_map_suggestions() {
+  public static function field_property_map_suggestions() {
     $map = parent::field_property_map_suggestions();
     $rendered_key = PATTERNBUILDER_PROPERTY_MAP_RENDERED_NAME;
 

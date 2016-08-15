@@ -47,7 +47,57 @@ class pbi_field implements pbi_field_interface {
    * {@inheritdoc}
    */
   public static function settings_form() {
-    return array();
+    $form = array();
+    $classname = get_called_class();
+    $my_classname = get_class();
+    if ($classname === $my_classname) {
+      $settings = static::settings_values();
+      $storage_id = static::settings_storage_id();
+
+      $form[$storage_id] = array(
+        '#type' => 'fieldset',
+        '#title' => $classname,
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#tree' => TRUE,
+      );
+
+      $form[$storage_id]['text_preview_trim_length'] = array(
+        '#title' => t('Text field preview trimmed limit'),
+        '#type' => 'textfield',
+        '#field_suffix' => t('characters'),
+        '#size' => 10,
+        '#default_value' => $settings['text_preview_trim_length'],
+        '#element_validate' => array('element_validate_integer_positive'),
+        '#description' => t('If the summary is not set, the trimmed text field will be shorter than this character limit.'),
+      );
+    }
+    return $form;
+  }
+
+  /**
+   * Wrapper of field_ui_widget_type_options().
+   *
+   * Provides widget options without requiring the field_ui module.
+   *
+   * @param string $field_type
+   *   The field type.
+   *
+   * @return array
+   *   An array of widget options keyed by type.
+   */
+  public static function field_widget_type_options($field_type) {
+    $options = array();
+    $field_type_info = field_info_field_types($field_type);
+    if (!empty($field_type_info)) {
+      foreach (field_info_widget_types() as $name => $widget_type) {
+        if (in_array($field_type, $widget_type['field types'], TRUE)) {
+          $options[$name] = $widget_type['label'];
+        }
+      }
+    }
+
+    return $options;
   }
 
   /**
@@ -67,7 +117,12 @@ class pbi_field implements pbi_field_interface {
    * {@inheritdoc}
    */
   public static function settings_defaults() {
-    return array();
+    $defaults = array();
+
+    if (get_called_class() === get_class()) {
+      $defaults['text_preview_trim_length'] = 200;
+    }
+    return $defaults;
   }
 
   /**
@@ -94,6 +149,59 @@ class pbi_field implements pbi_field_interface {
     }
 
     return $stored;
+  }
+
+  /**
+   * Extracts settings with a given prefix.
+   *
+   * @param string $prefix
+   *   The prefix to find.
+   *
+   * @return array
+   *   An array of values keyed by the field instance settings name.
+   */
+  public static function handler_extract_settings($prefix) {
+    $prefix_len = drupal_strlen($prefix);
+    $extracted_settings = array();
+    $settings = static::settings_values();
+    foreach ($settings as $setting_name => $setting_value) {
+      if (strpos($setting_name, $prefix) === 0) {
+        $extracted_setting_name = substr($setting_name, $prefix_len);
+        $extracted_settings[$extracted_setting_name] = $setting_value;
+      }
+    }
+
+    return $extracted_settings;
+  }
+
+  /**
+   * Extracts field settings from the handler settings.
+   *
+   * @return array
+   *   An array of values keyed by the field settings name.
+   */
+  public static function handler_field_settings() {
+    return static::handler_extract_settings('field__');
+  }
+
+  /**
+   * Extracts instance settings from the handler settings.
+   *
+   * @return array
+   *   An array of values keyed by the field instance settings name.
+   */
+  public static function handler_instance_settings() {
+    return static::handler_extract_settings('instance__');
+  }
+
+  /**
+   * Extracts widget settings from the handler settings.
+   *
+   * @return array
+   *   An array of values keyed by the field widget settings name.
+   */
+  public static function handler_widget_settings() {
+    return static::handler_extract_settings('widget__');
   }
 
   /**
@@ -264,6 +372,12 @@ class pbi_field implements pbi_field_interface {
     // Merge with system default settings.
     $settings += $this->system_default_field_instance_settings($property, $base, $instance);
 
+    // Set handler instance settings to override defaults.
+    $handler_settings = static::handler_instance_settings();
+    if ($handler_settings) {
+      $settings = $handler_settings + $settings;
+    }
+
     // Allow others to alter.
     $context = array(
       'base' => $base,
@@ -355,6 +469,92 @@ class pbi_field implements pbi_field_interface {
       // Explicitly set the default formatter to allow field type changes
       // that are allowed due to no data stored or due to type conversions.
       $formatter = $this->system_default_field_formatter($property, $base, $instance);
+    }
+
+    return $formatter;
+  }
+
+  /**
+   * Invoke the Drupal hook to determine the preview field formatter settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   A display array for the default field formatter.
+   */
+  protected function hook_preview_field_formatter($property, array $base, array $instance) {
+    $formatter = patternbuilder_importer_get_property_preview_formatter($property, $base, $instance);
+    return $formatter ? $formatter : array();
+  }
+
+  /**
+   * Determine preview field formatter settings.
+   *
+   * @param object $property
+   *   The full property object.
+   * @param array $base
+   *   The built field base array.
+   * @param array $instance
+   *   The built field instance array.
+   *
+   * @return array
+   *   A display array for the preview field formatter.
+   */
+  protected function determine_preview_field_formatter($property, array $base, array $instance) {
+    $formatter = $this->hook_preview_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      // Native defaults for some types.
+      if (!empty($base['type'])) {
+        // Text fields.
+        $text_field_types = array('text', 'text_long', 'text_with_summary');
+        if (in_array($base['type'], $text_field_types, TRUE)) {
+          $settings = static::settings_values();
+          // Provide some sane defaults.
+          if (module_exists('smart_trim')) {
+            $formatter = array(
+              'type' => 'smart_trim_format',
+              'label' => 'hidden',
+              'module' => 'smart_trim',
+              'weight' => 1,
+              'settings' => array(
+                'more_link' => 0,
+                'more_text' => 'Read more',
+                'summary_handler' => 'trim',
+                'trim_type' => 'chars',
+                'trim_length' => $settings['text_preview_trim_length'],
+                'trim_link' => 0,
+                'trim_preserve_tags' => '',
+                'trim_suffix' => '',
+                'trim_options' => array(
+                  'smart_boundaries' => 'smart_boundaries',
+                  'text' => 'text',
+                ),
+              ),
+            );
+          }
+          else {
+            $formatter = array(
+              'type' => $base['type'] === 'text_with_summary' ? 'text_summary_or_trimmed' : 'text_trimmed',
+              'label' => 'hidden',
+              'weight' => 1,
+              'settings' => array(
+                'trim_length' => $settings['text_preview_trim_length'],
+              ),
+            );
+          }
+        }
+      }
+
+      // Explicitly set the preview formatter to allow field type changes
+      // that are allowed due to no data stored or due to type conversions.
+      if (empty($formatter)) {
+        $formatter = $this->system_default_field_formatter($property, $base, $instance);
+      }
     }
 
     return $formatter;
@@ -464,6 +664,17 @@ class pbi_field implements pbi_field_interface {
    */
   protected function determine_field_widget($property, array $base, array $instance) {
     $widget = array();
+
+    // Set to handler widget settings to override defaults.
+    $handler_settings = static::handler_widget_settings();
+    if (!empty($handler_settings)) {
+      $widget = $handler_settings;
+
+      // Return if the type is defined.
+      if (!empty($widget['type'])) {
+        return $widget;
+      }
+    }
 
     switch ($base['type']) {
       case 'list_boolean':
@@ -580,6 +791,12 @@ class pbi_field implements pbi_field_interface {
       'settings' => array(),
     );
 
+    // Initialize field settings with handler settings.
+    $handler_field_settings = static::handler_field_settings();
+    if ($handler_field_settings) {
+      $base['settings'] = $handler_field_settings;
+    }
+
     // Determine if field is required.
     $is_required = !empty($required_properties) && (in_array($name, $required_properties));
 
@@ -639,10 +856,24 @@ class pbi_field implements pbi_field_interface {
       $instance['widget'] = drupal_array_merge_deep($instance['widget'], $widget_info);
     }
 
-    // Merge formatter settings.
-    $formatter = $this->determine_default_field_formatter($property, $base, $instance);
-    if ($formatter) {
-      $instance['display']['default'] = $formatter;
+    // Merge default formatter settings.
+    $default_formatter = $this->determine_default_field_formatter($property, $base, $instance);
+    if ($default_formatter) {
+      if (!isset($default_formatter['weight'])) {
+        $default_formatter['weight'] = $weight;
+      }
+      $instance['display']['default'] = $default_formatter;
+    }
+
+    // Merge preview formatter settings.
+    if (pbi_utility::property_is_preview($property)) {
+      $preview_formatter = $this->determine_preview_field_formatter($property, $base, $instance);
+      if ($preview_formatter) {
+        if (!isset($preview_formatter['weight'])) {
+          $preview_formatter['weight'] = $weight;
+        }
+        $instance['display']['paragraphs_editor_preview'] = $preview_formatter;
+      }
     }
 
     // Set default value.
