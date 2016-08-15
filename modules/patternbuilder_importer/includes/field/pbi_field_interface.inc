@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Interface for creating Drupal fields for pattern properties.

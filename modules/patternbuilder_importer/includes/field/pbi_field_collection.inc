@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal field collections for pattern properties.

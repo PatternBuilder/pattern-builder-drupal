@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal paragraph fields for pattern properties.

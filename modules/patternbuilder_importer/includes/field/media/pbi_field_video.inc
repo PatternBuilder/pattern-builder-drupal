@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal video fields for pattern properties.

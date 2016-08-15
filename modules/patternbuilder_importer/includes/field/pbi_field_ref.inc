@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for referencing existing Drupal fields.

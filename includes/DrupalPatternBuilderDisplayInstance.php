@@ -424,7 +424,6 @@ class DrupalPatternBuilderDisplayInstance {
     return $return;
   }
 
-
   /**
    * Create an id used to flag this field display as prepared.
    *
