@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Drush interface for patternbuilder_importer.

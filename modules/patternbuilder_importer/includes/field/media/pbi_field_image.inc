@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal image fields for pattern properties.

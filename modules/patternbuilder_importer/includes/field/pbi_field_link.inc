@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal link fields for pattern properties.

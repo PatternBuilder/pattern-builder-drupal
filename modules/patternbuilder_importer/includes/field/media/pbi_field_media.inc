@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for Drupal media file fields for schema entity object properties.
