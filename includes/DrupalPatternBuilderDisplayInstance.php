@@ -496,23 +496,25 @@ class DrupalPatternBuilderDisplayInstance {
     // See field_view_field().
     $prepared_id = $this->getPreparedId();
     if (empty($this->entity->_field_view_prepared) || (isset($this->entity->_pb_field_views_prepared) && !in_array($prepared_id, $this->entity->_pb_field_views_prepared))) {
-      $null = NULL;
+      if (!empty($this->entity->{$field_name}[$this->language])) {
+        $null = NULL;
 
-      // Single field prepare.
-      $options = array(
-        'field_name' => $field_name,
-        'language' => $this->language,
-      );
+        // Single field prepare.
+        $options = array(
+          'field_name' => $field_name,
+          'language' => $this->language,
+        );
 
-      // First let the field types do their preparation.
-      _field_invoke_multiple('prepare_view', $entity_type, array($this->entityId => $this->entity), $this->display, $null, $options);
-      // Then let the formatters do their own specific massaging.
-      _field_invoke_multiple_default('prepare_view', $entity_type, array($this->entityId => $this->entity), $this->display, $null, $options);
+        // First let the field types do their preparation.
+        _field_invoke_multiple('prepare_view', $entity_type, array($this->entityId => $this->entity), $this->display, $null, $options);
+        // Then let the formatters do their own specific massaging.
+        _field_invoke_multiple_default('prepare_view', $entity_type, array($this->entityId => $this->entity), $this->display, $null, $options);
 
-      // Mark this item as prepared similar to field_view_field.
-      // Note: This function and field_view_field only prepare a single field
-      // so this flag is meaningless.
-      $this->entity->_field_view_prepared = TRUE;
+        // Mark this item as prepared similar to field_view_field.
+        // Note: This function and field_view_field only prepare a single field
+        // so this flag is meaningless.
+        $this->entity->_field_view_prepared = TRUE;
+      }
 
       // Set a specific flag per field display.
       $this->entity->_pb_field_views_prepared[] = $prepared_id;
