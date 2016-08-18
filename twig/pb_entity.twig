@@ -1,0 +1,15 @@
+{# Template for rendered entity content that has been sanitized by Drupal. #}
+
+{% if classes_array %}
+  {% set raw_classes %}{% for item in classes_array %} {{item}}{% endfor %}{% endset %}
+{% endif %}
+
+{% if attributes_array %}
+  {% set raw_attributes %}{% for item in attributes_array %} {{item}}{% endfor %}{% endset %}
+{% endif %}
+
+{% if (content) %}
+  <div class="pb-entity{{raw_classes}}"{{raw_attributes}}>
+    {{content|raw}}
+  </div>
+{% endif %}

@@ -59,6 +59,39 @@ function patternbuilder_schema() {
 }
 
 /**
+ * Defined patternbuilder directories.
+ *
+ * @return array
+ *   An array of directories with keys of 'schemas' and 'templates'.
+ */
+function _patternbuilder_install_get_patternbuilder_dirs() {
+  $path = drupal_get_path('module', 'patternbuilder');
+  return array(
+    'templates' => array(
+      $path . '/templates',
+    ),
+  );
+}
+
+/**
+ * Add patternbuilder directories.
+ */
+function _patternbuilder_install_add_patternbuilder_dirs() {
+  drupal_load('module', 'patternbuilder');
+
+  // Add new directories.
+  $pb_dirs = _patternbuilder_install_get_patternbuilder_dirs();
+
+  if (!empty($pb_dirs['schemas'])) {
+    patternbuilder_schema_dirs_add($pb_dirs['schemas']);
+  }
+
+  if (!empty($pb_dirs['templates'])) {
+    patternbuilder_template_dirs_add($pb_dirs['templates']);
+  }
+}
+
+/**
  * Implements hook_modules_enabled().
  */
 function patternbuilder_modules_enabled($modules) {
@@ -425,4 +458,11 @@ function patternbuilder_update_7103() {
       }
     }
   }
+}
+
+/**
+ * Add a native twig template directory.
+ */
+function patternbuilder_update_7104() {
+  _patternbuilder_install_add_patternbuilder_dirs();
 }
