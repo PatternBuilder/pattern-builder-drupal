@@ -13,6 +13,7 @@
 class DrupalPatternBuilder {
   const SCHEMA_ENTITY_TYPE = 'paragraphs_item';
   const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS = 'DrupalPatternBuilderDisplayInstance';
+  const PB_NATIVE_ENTITY_SCHEMA_NAME = 'pb_entity';
 
   /**
    * The entity object.
@@ -403,8 +404,14 @@ class DrupalPatternBuilder {
               $ref_entity = static::loadReferenceItemEntity($field_data_type, $field_item);
               if ($ref_entity) {
                 $ref_component = $this->loadSchemaByEntity($field_data_type, $ref_entity);
+
+                // If not a patttern component.
                 if (empty($ref_component)) {
-                  if (_patternbuilder_entity_is_tuple($field_data_type, $ref_entity)) {
+                  if ($field_data_type == static::SCHEMA_ENTITY_TYPE) {
+                    // Render content for non-pattern schema entity types.
+                    $ref_component = $this->createNonSchemaEntityComponent($field_data_type, $ref_entity, $ref_view_mode);
+                  }
+                  elseif (_patternbuilder_entity_is_tuple($field_data_type, $ref_entity)) {
                     // Tuples are build as an array of items.
                     // @todo: Should this be a custom value array component to
                     // support tuples of tuples?
@@ -449,6 +456,61 @@ class DrupalPatternBuilder {
     }
 
     return $this;
+  }
+
+  /**
+   * Create a component for a non-schema driven entity.
+   *
+   * This renders the entity and then uses Pattern Builders native value
+   * component. The name is set to "pb_raw" so that "pb_raw.twig" can be
+   * used to render the component.
+   * To override "pb_raw.twig", create a custom "pb_raw.twig" and remove
+   * the patternbuilder template directory at
+   * "admin/config/content/patternbuilder".
+   *
+   * @param string $entity_type
+   *   The entity type.
+   * @param string $entity
+   *   The entity object.
+   * @param string $view_mode
+   *   The Drupal field display mode.
+   *
+   * @return Component|null
+   *   The schema component object.
+   */
+  protected function createNonSchemaEntityComponent($entity_type, $entity, $view_mode = 'full') {
+    $name = static::PB_NATIVE_ENTITY_SCHEMA_NAME;
+    if (empty($name)) {
+      return NULL;
+    }
+
+    $component = NULL;
+    $render = array();
+    if (method_exists($entity, 'view')) {
+      $render = $entity->view($view_mode);
+    }
+    else {
+      list($entity_id) = entity_extract_ids($entity_type, $entity);
+      $entity_id = $entity_id ? $entity_id : 0;
+      $render = entity_view($entity_type, array($entity_id => $entity), $view_mode);
+    }
+
+    if (!empty($render)) {
+      $rendered = render($render);
+      if ($rendered) {
+        $component = new DrupalPatternBuilderValueProperty();
+        $component->setByAssoc(array(
+          'name' => $name,
+          'content' => $rendered,
+          'classes_array' => array(
+            drupal_html_class($name . '-' . $entity_type),
+            drupal_html_class($name . '-' . $entity_type . '-' . $view_mode),
+          ),
+        ));
+      }
+    }
+
+    return $component;
   }
 
   /**
