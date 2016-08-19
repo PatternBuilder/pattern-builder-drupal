@@ -68,7 +68,7 @@ function _patternbuilder_install_get_patternbuilder_dirs() {
   $path = drupal_get_path('module', 'patternbuilder');
   return array(
     'templates' => array(
-      $path . '/templates',
+      $path . '/twig',
     ),
   );
 }
@@ -464,5 +464,12 @@ function patternbuilder_update_7103() {
  * Add a native twig template directory.
  */
 function patternbuilder_update_7104() {
+  // Pass to 7105.
+}
+
+/**
+ * Set correct native twig template directory.
+ */
+function patternbuilder_update_7105() {
   _patternbuilder_install_add_patternbuilder_dirs();
 }
