@@ -45,7 +45,6 @@ class pbi_field_paragraph extends pbi_field {
   public static function settings_form() {
     $form = parent::settings_form();
     $storage_id = static::settings_storage_id();
-    $settings = static::settings_values();
     $classname = get_called_class();
     $field_type = static::global_field_type();
 
