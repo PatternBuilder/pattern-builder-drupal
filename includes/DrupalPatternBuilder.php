@@ -489,6 +489,12 @@ class DrupalPatternBuilder {
       return NULL;
     }
 
+    // Check view access.
+    if (!entity_access('view', $entity_type, $entity)) {
+      return NULL;
+    }
+
+    // Build component.
     $component = NULL;
     $render = array();
     if (method_exists($entity, 'view')) {
