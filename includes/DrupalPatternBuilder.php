@@ -14,6 +14,7 @@ class DrupalPatternBuilder {
   const SCHEMA_ENTITY_TYPE = 'paragraphs_item';
   const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS = 'DrupalPatternBuilderDisplayInstance';
   const PB_NATIVE_ENTITY_SCHEMA_NAME = 'pb_entity';
+  const PB_NATIVE_RAW_SCHEMA_NAME = 'pb_raw';
 
   /**
    * The entity object.
@@ -396,8 +397,8 @@ class DrupalPatternBuilder {
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
           $field_data_type = entity_property_extract_innermost_type($field_data_type_defined);
-          $field_is_reference = in_array($field_data_type, $ref_entity_types, TRUE);
-          if ($field_is_reference) {
+          $field_is_chainable_reference = in_array($field_data_type, $ref_entity_types, TRUE);
+          if ($field_is_chainable_reference) {
             // Reference field.
             $ref_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
             foreach ($field_items as $field_delta => $field_item) {
@@ -429,6 +430,10 @@ class DrupalPatternBuilder {
                 }
               }
             }
+          }
+          elseif (entity_get_info($field_data_type)) {
+            // Wrap rendered entity reference fields in a raw component.
+            $this->fieldSetComponent($component, $display, TRUE);
           }
           else {
             // Rendered field.
@@ -514,19 +519,54 @@ class DrupalPatternBuilder {
   }
 
   /**
+   * Create a component for a rendered markup.
+   *
+   * @param string $markup
+   *   The rendered content.
+   *
+   * @return Component|null
+   *   The schema component object.
+   */
+  protected function createRawComponent($markup) {
+    $name = static::PB_NATIVE_RAW_SCHEMA_NAME;
+    if (empty($name)) {
+      return NULL;
+    }
+
+    // Build component.
+    $component = new DrupalPatternBuilderValueProperty();
+    $component->setByAssoc(array(
+      'name' => $name,
+      'content' => $markup,
+    ));
+
+    return $component;
+  }
+
+  /**
    * Maps rendered field items to the component property.
    *
    * @param Component|array $component
    *   The schema component object.
    * @param DrupalPatternBuilderDisplayInstance $display
    *   An instance of a display handler.
+   * @param bool $create_item_components
+   *   Create raw value components for each field item.
    */
-  protected function fieldSetComponent($component, DrupalPatternBuilderDisplayInstance $display) {
+  protected function fieldSetComponent($component, DrupalPatternBuilderDisplayInstance $display, $create_item_components = FALSE) {
     if ($values = $display->view()) {
       $property_name = $display->getPbSettings('real_property_name');
       $parent_property_names = $display->getPbSettings('parent_property_names_array');
-      foreach ($values as $delta => $value) {
-        static::setComponentValue($component, $property_name, $value, $parent_property_names);
+      if ($create_item_components) {
+        foreach ($values as $delta => $value) {
+          $item_component = $this->createRawComponent($value);
+          static::setComponentValue($component, $property_name, $item_component, $parent_property_names);
+        }
+      }
+      else {
+        foreach ($values as $delta => $value) {
+          static::setComponentValue($component, $property_name, $value, $parent_property_names);
+        }
       }
     }
   }
