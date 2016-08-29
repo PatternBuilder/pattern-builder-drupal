@@ -397,43 +397,69 @@ class DrupalPatternBuilder {
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
           $field_data_type = entity_property_extract_innermost_type($field_data_type_defined);
-          $field_is_chainable_reference = in_array($field_data_type, $ref_entity_types, TRUE);
-          if ($field_is_chainable_reference) {
-            // Reference field.
-            $ref_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
+          $field_entity_info = entity_get_info($field_data_type);
+          $field_is_chainable_reference = $field_entity_info && in_array($field_data_type, $ref_entity_types, TRUE);
+          $field_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
+
+          if ($field_entity_info) {
+            // Entity references.
+            $field_has_wrapped_schemas = FALSE;
             foreach ($field_items as $field_delta => $field_item) {
-              $ref_entity = static::loadReferenceItemEntity($field_data_type, $field_item);
-              if ($ref_entity) {
-                $ref_component = $this->loadSchemaByEntity($field_data_type, $ref_entity);
+              $ref_entity_type = $field_data_type;
+              $ref_entity = static::loadReferenceItemEntity($ref_entity_type, $field_item);
+
+              if ($ref_entity && entity_access('view', $ref_entity_type, $ref_entity)) {
+                // If not chainable, then determine if this is a wrapped schema.
+                if (!$field_is_chainable_reference) {
+                  // Attempt to unwrap the schema.
+                  $field_wrapped_schema_instance = patternbuilder_wrapped_schema_field_instance_by_entity($ref_entity_type, $ref_entity);
+                  if (!empty($field_wrapped_schema_instance['field_name'])) {
+                    $wrapped_field_items = static::field_get_items($ref_entity_type, $ref_entity, $field_wrapped_schema_instance['field_name']);
+                    if (!empty($wrapped_field_items)) {
+                      // There can be only 1 wrapped field item.
+                      $wrapped_field_item = reset($wrapped_field_items);
+                      $wrapped_ref_entity_type = static::SCHEMA_ENTITY_TYPE;
+                      $wrapped_ref_entity = static::loadReferenceItemEntity($wrapped_ref_entity_type, $wrapped_field_item);
+                      if ($wrapped_ref_entity && entity_access('view', $wrapped_ref_entity_type, $wrapped_ref_entity)) {
+                        $ref_entity_type = $wrapped_ref_entity_type;
+                        $ref_entity = $wrapped_ref_entity;
+                      }
+                    }
+                  }
+                }
+
+                // Load the pattern component.
+                $ref_component = $this->loadSchemaByEntity($ref_entity_type, $ref_entity);
 
                 // If not a patttern component.
                 if (empty($ref_component)) {
-                  if ($field_data_type == static::SCHEMA_ENTITY_TYPE) {
+                  if ($ref_entity_type == static::SCHEMA_ENTITY_TYPE) {
                     // Render content for non-pattern schema entity types.
-                    $ref_component = $this->createNonSchemaEntityComponent($field_data_type, $ref_entity, $ref_view_mode);
+                    $ref_component = $this->createNonSchemaEntityComponent($ref_entity_type, $ref_entity, $field_view_mode);
                   }
-                  elseif (_patternbuilder_entity_is_tuple($field_data_type, $ref_entity)) {
+                  elseif (_patternbuilder_entity_is_tuple($ref_entity_type, $ref_entity)) {
                     // Tuples are build as an array of items.
                     // @todo: Should this be a custom value array component to
                     // support tuples of tuples?
                     $ref_component = array();
                   }
-                  else {
+                  elseif ($field_is_chainable_reference) {
                     // Fallback to a generic value component.
                     $ref_component = new DrupalPatternBuilderValueProperty();
                   }
                 }
 
                 if (isset($ref_component)) {
-                  $this->build($ref_component, $field_data_type, $ref_entity, $ref_view_mode);
+                  // Pattern components.
+                  $this->build($ref_component, $ref_entity_type, $ref_entity, $field_view_mode);
                   static::setComponentValue($component, $display->getPbSettings('real_property_name'), $ref_component, $display->getPbSettings('parent_property_names_array'));
+                }
+                else {
+                  // Set rendered entity reference fields as raw components.
+                  $this->fieldSetComponent($component, $display, TRUE);
                 }
               }
             }
-          }
-          elseif (entity_get_info($field_data_type)) {
-            // Wrap rendered entity reference fields in a raw component.
-            $this->fieldSetComponent($component, $display, TRUE);
           }
           else {
             // Rendered field.
@@ -713,6 +739,12 @@ class DrupalPatternBuilder {
     }
     elseif (!empty($values['id'])) {
       return entity_load_single($entity_type, $values['id']);
+    }
+    elseif (!empty($values['vid'])) {
+      return entity_revision_load($entity_type, $values['vid']);
+    }
+    elseif (!empty($values['nid'])) {
+      return entity_load_single($entity_type, $values['nid']);
     }
   }
 

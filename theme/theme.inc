@@ -103,7 +103,7 @@ function patternbuilder_render_schema(ParagraphsItemEntity $entity, $view_mode =
       }
     }
     catch (Exception $e) {
-      watchdog('patternbuilder', 'An error occurred while rendering the @bundle paragraph item (id:@id, revision:@vid) on @host_entity_type (id:@host_id, revision:@host_vid): @error.', array(
+      watchdog('patternbuilder', 'An error occurred while rendering the @bundle paragraph item (id:@id, revision:@vid) on @host_entity_type (id:@host_id, revision:@host_vid): @error', array(
         '@id' => $entity->item_id,
         '@vid' => $entity->revision_id,
         '@bundle' => $entity->bundle(),

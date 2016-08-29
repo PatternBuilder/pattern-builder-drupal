@@ -1967,3 +1967,97 @@ function patternbuilder_field_formatter_view($entity_type, $entity, $field, $ins
 
   return $element;
 }
+
+/**
+ * Implements hook_form_FORM_ID_alter() for node_type_form().
+ */
+function patternbuilder_form_node_type_form_alter(&$form, &$form_state) {
+  if (isset($form['#node_type']->type)) {
+    $type = $form['#node_type'];
+
+    $form['patternbuilder'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Pattern Builder'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#group' => 'additional_settings',
+    );
+
+    // The node type is automatically appended to the name.
+    $form['patternbuilder']['patternbuilder_wrapped_schema_bundle_node'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Use this node type as a wrapped pattern'),
+      '#description' => t('A wrapped pattern is a single paragraph field on a node type. If enabled, then only the single paragraph field will be rendered when a node of this type is referenced in a larger pattern.  This provides a way to control publishing and moderation of sub-patterns.'),
+      '#default_value' => variable_get('patternbuilder_wrapped_schema_bundle_node_' . $type->type, FALSE),
+    );
+  }
+}
+
+/**
+ * Determine if an entity bundle is a wrapped schema.
+ *
+ * @param string $entity_type
+ *   The entity type.
+ * @param string $entity_bundle
+ *   The entity bundle.
+ *
+ * @return bool
+ *   TRUE if this bundle enabled to be a wrapped schema.
+ */
+function patternbuilder_entity_bundle_is_wrapped_schema($entity_type, $entity_bundle) {
+  return variable_get('patternbuilder_wrapped_schema_bundle_' . $entity_type . '_' . $entity_bundle, FALSE);
+}
+
+/**
+ * Get the wrapped schema field instance for an entity bundle.
+ *
+ * A wrapped schema field is defined as 1 and only 1 field matching the
+ * following on the provided bundle:
+ * - Field type = "paragraphs".
+ * - Field cardinality = 1.
+ *
+ * @param string $entity_type
+ *   The entity type.
+ * @param string $entity_bundle
+ *   The entity bundle.
+ *
+ * @return array|null
+ *   The paragraph field instance array if found, else NULL.
+ */
+function patternbuilder_wrapped_schema_field_instance($entity_type, $entity_bundle) {
+  if (patternbuilder_entity_bundle_is_wrapped_schema($entity_type, $entity_bundle)) {
+    $schema_instances = array();
+    $field_instances = field_info_instances($entity_type, $entity_bundle);
+    foreach ($field_instances as $field_name => $field_instance) {
+      $field_info = field_info_field($field_name);
+      if (isset($field_info['type']) && $field_info['type'] == 'paragraphs' && $field_info['cardinality'] == 1) {
+        $schema_instances[$field_name] = $field_instance;
+      }
+    }
+
+    if (count($schema_instances) == 1) {
+      return reset($schema_instances);
+    }
+  }
+}
+
+/**
+ * Get the wrapped schema field instance for a given entity.
+ *
+ * @param string $entity_type
+ *   The entity type.
+ * @param object $entity
+ *   The entity object.
+ *
+ * @return array|null
+ *   The paragraph field instance array if found, else NULL.
+ */
+function patternbuilder_wrapped_schema_field_instance_by_entity($entity_type, $entity) {
+  list($entity_id, $entity_revision_id, $entity_bundle) = @entity_extract_ids($entity_type, $entity);
+  if ($entity_bundle) {
+    $schema_instance = patternbuilder_wrapped_schema_field_instance($entity_type, $entity_bundle);
+    if (!empty($schema_instance['field_name'])) {
+      return $schema_instance;
+    }
+  }
+}
