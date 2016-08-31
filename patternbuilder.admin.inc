@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Admin pages for patternbuilder.
@@ -366,10 +367,35 @@ function patternbuilder_paragraphs_admin_bundle_overview() {
     }
 
     // Get components.
+    $available_bundles = paragraphs_bundle_load();
     $bundle_components = patternbuilder_get_bundle_component_map();
 
+    // Sort the table.
+    $bundle_labels = array();
+    foreach ($available_bundles as $bundle_name => $bundle_info) {
+      $bundle_labels[$bundle_name] = isset($bundle_info->name) ? $bundle_info->name : $bundle_name;
+    }
+    uasort($bundle_labels, 'strnatcasecmp');
+
+    $sorted_keys = array_keys($bundle_labels);
+    $pattern_keys = array_intersect($sorted_keys, array_keys($bundle_components));
+    $non_patterns_keys = array_diff($sorted_keys, $pattern_keys);
+    $row_keys = array_keys($page['paragraphs_bundle_table']['#rows']);
+    $sorted_row_keys = array_merge($pattern_keys, $non_patterns_keys);
+    $sorted_row_keys = array_merge($sorted_row_keys, array_diff($row_keys, $sorted_row_keys));
+
     // Alter bundle rows.
-    foreach ($page['paragraphs_bundle_table']['#rows'] as $bundle_name => &$row) {
+    $rows = $page['paragraphs_bundle_table']['#rows'];
+    $new_rows = array();
+    foreach ($sorted_row_keys as $bundle_name) {
+      if (!isset($rows[$bundle_name])) {
+        continue;
+      }
+
+      $row = $rows[$bundle_name];
+      $row_attributes = array(
+        'class' => array(drupal_html_class($bundle_name)),
+      );
       $bundle_url_string = strtr($bundle_name, array('_' => '-'));
 
       // If bundle is a pattern ...
@@ -396,6 +422,16 @@ function patternbuilder_paragraphs_admin_bundle_overview() {
         // Empty string for the Pattern form link column.
         $row[] = array('data' => '&nbsp');
       }
+
+      // Make this a complex row.
+      $row = array('data' => $row) + $row_attributes;
+
+      // Set new row.
+      $new_rows[$bundle_name] = $row;
+    }
+
+    if ($new_rows) {
+      $page['paragraphs_bundle_table']['#rows'] = $new_rows;
     }
   }
 

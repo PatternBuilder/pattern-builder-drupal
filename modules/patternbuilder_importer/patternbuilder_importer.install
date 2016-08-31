@@ -1,0 +1,59 @@
+<?php
+
+/**
+ * @file
+ * Patternbuilder Importer install file.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function patternbuilder_importer_uninstall() {
+  // Cleanup module variables.
+  $vars = db_select('variable', 'v')
+    ->fields('v', array('name'))
+    ->condition(db_or()
+      ->condition('name', db_like('patternbuilder_importer') . '%', 'LIKE')
+      ->condition('name', db_like('pbi_handler_') . '%', 'LIKE')
+    )
+    ->execute()
+    ->fetchCol();
+
+  if ($vars) {
+    foreach ($vars as $var) {
+      variable_del($var);
+    }
+  }
+}
+
+/**
+ * Move legacy paragraphs settings to new settings.
+ */
+function patternbuilder_importer_update_7101() {
+  // Old variable name => new settings key.
+  $map = array(
+    'patternbuilder_default_paragraphs_item_title' => 'instance_title',
+    'patternbuilder_default_paragraphs_item_title_plural' => 'instance_title_multiple',
+    'patternbuilder_default_paragraphs_item_edit_mode' => 'instance_default_edit_mode',
+  );
+
+  $values = array();
+  foreach ($map as $old_varname => $new_key) {
+    $value = variable_get($old_varname, NULL);
+    if (isset($value)) {
+      $values[$new_key] = $value;
+    }
+  }
+
+  if ($values) {
+    // Set new settings.
+    $existing = variable_get('pbi_handler_pbi_field_paragraph', array());
+    $new_values = $existing ? $values + $existing : $values;
+    variable_set('pbi_handler_pbi_field_paragraph', $new_values);
+
+    // Remove old variables.
+    foreach ($map as $old_varname => $new_key) {
+      variable_del($old_varname);
+    }
+  }
+}

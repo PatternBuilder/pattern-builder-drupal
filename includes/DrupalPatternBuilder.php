@@ -16,6 +16,8 @@ use PatternBuilder\Factory\ComponentFactory;
 class DrupalPatternBuilder {
   const SCHEMA_ENTITY_TYPE = 'paragraphs_item';
   const FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT = 'DrupalPatternBuilderDisplayInstance';
+  const PB_NATIVE_ENTITY_SCHEMA_NAME = 'pb_entity';
+  const PB_NATIVE_RAW_SCHEMA_NAME = 'pb_raw';
 
   /**
    * The entity object.
@@ -405,34 +407,70 @@ class DrupalPatternBuilder {
         if ($field_items) {
           $field_data_type_defined = $entity_wrapper->{$field_name}->type();
           $field_data_type = entity_property_extract_innermost_type($field_data_type_defined);
-          $field_is_reference = in_array($field_data_type, $ref_entity_types, TRUE);
-          if ($field_is_reference) {
-            // Reference field.
-            $ref_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
+          $field_entity_info = entity_get_info($field_data_type);
+          $field_is_chainable_reference = $field_entity_info && in_array($field_data_type, $ref_entity_types, TRUE);
+          $field_view_mode = isset($field_display['settings']['view_mode']) ? $field_display['settings']['view_mode'] : 'default';
+
+          if ($field_entity_info) {
+            // Entity references.
+            $field_has_wrapped_schemas = FALSE;
             foreach ($field_items as $field_delta => $field_item) {
-              $ref_entity = static::loadReferenceItemEntity($field_data_type, $field_item);
-              if ($ref_entity) {
-                $ref_component = $this->loadSchemaByEntity($field_data_type, $ref_entity);
+              $ref_entity_type = $field_data_type;
+              $ref_entity = static::loadReferenceItemEntity($ref_entity_type, $field_item);
+
+              if ($ref_entity && entity_access('view', $ref_entity_type, $ref_entity)) {
+                // If not chainable, then determine if this is a wrapped schema.
+                if (!$field_is_chainable_reference) {
+                  // Attempt to unwrap the schema.
+                  $field_wrapped_schema_instance = patternbuilder_wrapped_schema_field_instance_by_entity($ref_entity_type, $ref_entity);
+                  if (!empty($field_wrapped_schema_instance['field_name'])) {
+                    $wrapped_field_items = static::fieldGetItems($ref_entity_type, $ref_entity, $field_wrapped_schema_instance['field_name']);
+                    if (!empty($wrapped_field_items)) {
+                      // There can be only 1 wrapped field item.
+                      $wrapped_field_item = reset($wrapped_field_items);
+                      $wrapped_ref_entity_type = static::SCHEMA_ENTITY_TYPE;
+                      $wrapped_ref_entity = static::loadReferenceItemEntity($wrapped_ref_entity_type, $wrapped_field_item);
+                      if ($wrapped_ref_entity && entity_access('view', $wrapped_ref_entity_type, $wrapped_ref_entity)) {
+                        $ref_entity_type = $wrapped_ref_entity_type;
+                        $ref_entity = $wrapped_ref_entity;
+                      }
+                    }
+                  }
+                }
+
+                // Load the pattern component.
+                $ref_component = $this->loadSchemaByEntity($ref_entity_type, $ref_entity);
+
+                // If not a patttern component.
                 if (empty($ref_component)) {
-                  if (_patternbuilder_entity_is_tuple($field_data_type, $ref_entity)) {
+                  if ($ref_entity_type == static::SCHEMA_ENTITY_TYPE) {
+                    // Render content for non-pattern schema entity types.
+                    $ref_component = $this->createNonSchemaEntityComponent($ref_entity_type, $ref_entity, $field_view_mode);
+                  }
+                  elseif (_patternbuilder_entity_is_tuple($ref_entity_type, $ref_entity)) {
                     // Tuples are build as an array of items.
                     // @todo: Should this be a custom value array component to
                     // support tuples of tuples?
                     $ref_component = array();
                   }
-                  elseif ($prop_component = $this->createPropertyComponent($component, $display->getPbSettings('real_property_name'))) {
+                  elseif ($field_is_chainable_reference && ($prop_component = $this->createPropertyComponent($component, $display->getPbSettings('real_property_name')))) {
                     // Create from property schema.
                     $ref_component = $prop_component;
                   }
-                  else {
+                  elseif ($field_is_chainable_reference) {
                     // Fallback to a generic value component.
                     $ref_component = new DrupalPatternBuilderValueProperty();
                   }
                 }
 
                 if (isset($ref_component)) {
-                  $this->build($ref_component, $field_data_type, $ref_entity, $ref_view_mode);
+                  // Pattern components.
+                  $this->build($ref_component, $ref_entity_type, $ref_entity, $field_view_mode);
                   static::setComponentValue($component, $display->getPbSettings('real_property_name'), $ref_component, $display->getPbSettings('parent_property_names_array'));
+                }
+                else {
+                  // Set rendered entity reference fields as raw components.
+                  $this->fieldSetComponent($component, $display, TRUE);
                 }
               }
             }
@@ -466,21 +504,150 @@ class DrupalPatternBuilder {
   }
 
   /**
+   * Create a component for a non-schema driven entity.
+   *
+   * This renders the entity and then uses Pattern Builders native value
+   * component. The name is set to "pb_raw" so that "pb_raw.twig" can be
+   * used to render the component.
+   * To override "pb_raw.twig", create a custom "pb_raw.twig" and remove
+   * the patternbuilder template directory at
+   * "admin/config/content/patternbuilder".
+   *
+   * @param string $entity_type
+   *   The entity type.
+   * @param string $entity
+   *   The entity object.
+   * @param string $view_mode
+   *   The Drupal field display mode.
+   *
+   * @return Component|null
+   *   The schema component object.
+   */
+  protected function createNonSchemaEntityComponent($entity_type, $entity, $view_mode = 'full') {
+    $name = static::PB_NATIVE_ENTITY_SCHEMA_NAME;
+    if (empty($name)) {
+      return NULL;
+    }
+
+    // Check view access.
+    if (!entity_access('view', $entity_type, $entity)) {
+      return NULL;
+    }
+
+    // Build component.
+    $component = NULL;
+    $render = array();
+    if (method_exists($entity, 'view')) {
+      $render = $entity->view($view_mode);
+    }
+    else {
+      list($entity_id) = entity_extract_ids($entity_type, $entity);
+      $entity_id = $entity_id ? $entity_id : 0;
+      $render = entity_view($entity_type, array($entity_id => $entity), $view_mode);
+    }
+
+    if (!empty($render)) {
+      $rendered = render($render);
+      if ($rendered) {
+        $component = new DrupalPatternBuilderValueProperty();
+        $component->setByAssoc(array(
+          'name' => $name,
+          'content' => $rendered,
+          'classes_array' => array(
+            drupal_html_class($name . '-' . $entity_type),
+            drupal_html_class($name . '-' . $entity_type . '-' . $view_mode),
+          ),
+        ));
+      }
+    }
+
+    return $component;
+  }
+
+  /**
+   * Create a component for a rendered markup.
+   *
+   * @param string $markup
+   *   The rendered content.
+   *
+   * @return Component|null
+   *   The schema component object.
+   */
+  protected function createRawComponent($markup) {
+    $name = static::PB_NATIVE_RAW_SCHEMA_NAME;
+    if (empty($name)) {
+      return NULL;
+    }
+
+    // Build component.
+    $component = new DrupalPatternBuilderValueProperty();
+    $component->setByAssoc(array(
+      'name' => $name,
+      'content' => $markup,
+    ));
+
+    return $component;
+  }
+
+  /**
    * Maps rendered field items to the component property.
    *
    * @param Component|array $component
    *   The schema component object.
    * @param DrupalPatternBuilderDisplayInstance $display
    *   An instance of a display handler.
+   * @param bool $create_item_components
+   *   Create raw value components for each field item.
    */
-  protected function fieldSetComponent($component, DrupalPatternBuilderDisplayInstance $display) {
+  protected function fieldSetComponent($component, DrupalPatternBuilderDisplayInstance $display, $create_item_components = FALSE) {
     if ($values = $display->view()) {
       $property_name = $display->getPbSettings('real_property_name');
       $parent_property_names = $display->getPbSettings('parent_property_names_array');
-      foreach ($values as $delta => $value) {
-        static::setComponentValue($component, $property_name, $value, $parent_property_names);
+      if ($create_item_components) {
+        foreach ($values as $delta => $value) {
+          $item_component = $this->createRawComponent($value);
+          static::setComponentValue($component, $property_name, $item_component, $parent_property_names);
+        }
+      }
+      else {
+        foreach ($values as $delta => $value) {
+          static::setComponentValue($component, $property_name, $value, $parent_property_names);
+        }
       }
     }
+  }
+
+  /**
+   * Returns the map of field type to display handler class name.
+   *
+   * @return array
+   *   The map array.
+   */
+  public static function fieldDisplayInstanceHandlerTypeMap() {
+    return array(
+      'list_boolean' => 'DrupalPatternBuilderDisplayInstanceBoolean',
+    );
+  }
+
+  /**
+   * Determines the class name of the display handler.
+   *
+   * @param array $field_instance
+   *   The field instance info.
+   *
+   * @return string
+   *   The display handler class name.
+   */
+  protected static function fieldDisplayInstanceHandlerClass(array $field_instance) {
+    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT;
+    $class_map = static::fieldDisplayInstanceHandlerTypeMap();
+    if ($class_map && isset($field_instance['field_name']) && ($field = field_info_field($field_instance['field_name'])) && !empty($field['type'])) {
+      if (isset($class_map[$field['type']])) {
+        $class_name = $class_map[$field['type']];
+      }
+    }
+
+    return $class_name;
   }
 
   /**
@@ -716,6 +883,12 @@ class DrupalPatternBuilder {
     }
     elseif (!empty($values['id'])) {
       return entity_load_single($entity_type, $values['id']);
+    }
+    elseif (!empty($values['vid'])) {
+      return entity_revision_load($entity_type, $values['vid']);
+    }
+    elseif (!empty($values['nid'])) {
+      return entity_load_single($entity_type, $values['nid']);
     }
   }
 

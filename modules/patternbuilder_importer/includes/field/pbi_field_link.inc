@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal link fields for pattern properties.
@@ -23,7 +24,7 @@ class pbi_field_link extends pbi_field_entity_abstract {
   /**
    * {@inheritdoc}
    */
-  protected static function field_property_map_suggestions() {
+  public static function field_property_map_suggestions() {
     return array(
       'url' => array('href', 'url', array('format' => 'url')),
       'title' => array('text'),

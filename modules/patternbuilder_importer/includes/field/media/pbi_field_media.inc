@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for Drupal media file fields for schema entity object properties.
@@ -97,7 +98,7 @@ class pbi_field_media extends pbi_field_entity_abstract {
   /**
    * {@inheritdoc}
    */
-  protected static function field_property_map_suggestions() {
+  public static function field_property_map_suggestions() {
     $map = array();
 
     // Url created from file_create_url($uri).
@@ -231,6 +232,23 @@ class pbi_field_media extends pbi_field_entity_abstract {
         'type' => 'file_rendered',
         'settings' => array(
           'file_view_mode' => 'default',
+        ),
+      );
+    }
+    return $formatter;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function determine_preview_field_formatter($property, array $base, array $instance) {
+    $formatter = $this->hook_preview_field_formatter($property, $base, $instance);
+    if (empty($formatter)) {
+      $formatter = array(
+        'type' => 'file_rendered',
+        'label' => 'hidden',
+        'settings' => array(
+          'file_view_mode' => 'preview',
         ),
       );
     }

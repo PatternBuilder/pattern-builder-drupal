@@ -26,4 +26,10 @@
  * @see template_process()
  */
 ?>
-<?php print render($content); ?>
+<?php if ($is_pattern): ?>
+  <?php print render($content); ?>
+<?php else: ?>
+  <div class="<?php print $classes; ?> clearfix"<?php print $attributes; ?>>
+    <?php print render($content); ?>
+  </div>
+<?php endif; ?>

@@ -59,6 +59,39 @@ function patternbuilder_schema() {
 }
 
 /**
+ * Defined patternbuilder directories.
+ *
+ * @return array
+ *   An array of directories with keys of 'schemas' and 'templates'.
+ */
+function _patternbuilder_install_get_patternbuilder_dirs() {
+  $path = drupal_get_path('module', 'patternbuilder');
+  return array(
+    'templates' => array(
+      $path . '/twig',
+    ),
+  );
+}
+
+/**
+ * Add patternbuilder directories.
+ */
+function _patternbuilder_install_add_patternbuilder_dirs() {
+  drupal_load('module', 'patternbuilder');
+
+  // Add new directories.
+  $pb_dirs = _patternbuilder_install_get_patternbuilder_dirs();
+
+  if (!empty($pb_dirs['schemas'])) {
+    patternbuilder_schema_dirs_add($pb_dirs['schemas']);
+  }
+
+  if (!empty($pb_dirs['templates'])) {
+    patternbuilder_template_dirs_add($pb_dirs['templates']);
+  }
+}
+
+/**
  * Implements hook_modules_enabled().
  */
 function patternbuilder_modules_enabled($modules) {
@@ -155,9 +188,17 @@ function patternbuilder_convert_text_field($field_name, $field_type_new) {
 
   // Get type info with defaults.
   $field_type_new_info = field_info_field_types($field_type_new);
-  if (!empty($field_type_new_info['settings'])) {
+  if (isset($field_type_new_info['settings'])) {
     if (!empty($field['settings'])) {
       $field['settings'] += $field_type_new_info['settings'];
+      // Cleanup field settings from old field.
+      if ($field['settings']) {
+        foreach (array_keys($field['settings']) as $field_setting_key) {
+          if (!array_key_exists($field_setting_key, $field_type_new_info['settings'])) {
+            unset($field['settings'][$field_setting_key]);
+          }
+        }
+      }
     }
     else {
       $field['settings'] = $field_type_new_info['settings'];
@@ -417,4 +458,18 @@ function patternbuilder_update_7103() {
       }
     }
   }
+}
+
+/**
+ * Add a native twig template directory.
+ */
+function patternbuilder_update_7104() {
+  // Pass to 7105.
+}
+
+/**
+ * Set correct native twig template directory.
+ */
+function patternbuilder_update_7105() {
+  _patternbuilder_install_add_patternbuilder_dirs();
 }

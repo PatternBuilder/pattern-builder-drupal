@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal field groups for pattern properties.

@@ -1,11 +1,12 @@
 <?php
+
 /**
  * @file
  * Default theme functions for paragraphs.
  */
 
 /**
- * Process variables for paragraphs-items.tpl.php.
+ * Process variables for patternbuilder-items.tpl.php.
  */
 function template_preprocess_patternbuilder_items(&$vars) {
   $vars['view_mode'] = $vars['element']['#view_mode'];
@@ -25,23 +26,27 @@ function template_preprocess_patternbuilder_items(&$vars) {
 }
 
 /**
- * Process variables for paragraphs-item.tpl.php.
+ * Process variables for patternbuilder-item.tpl.php.
  */
 function template_preprocess_patternbuilder_item(&$vars) {
   if (isset($vars['elements']['#entity_type']) && $vars['elements']['#entity_type'] != 'paragraphs_item') {
     return;
   }
-  $entity_type = 'paragraphs_item';
+  $entity_type = $vars['elements']['#entity_type'];
   $vars['entity_type'] = $entity_type;
 
   $langcode = !empty($vars['elements']['#language']) ? $vars['elements']['#language'] : LANGUAGE_NONE;
   $vars['language'] = $langcode;
 
   $entity = $vars['elements']['#entity'];
-  $vars[$vars['elements']['#entity_type']] = $entity;
+  $vars['entity'] = $entity;
 
   $entity_info = entity_get_info($entity_type);
-  list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+  list($entity_id, $revision_id , $bundle) = entity_extract_ids($entity_type, $entity);
+  $vars['bundle'] = $bundle;
+  $vars['entity_id'] = $entity_id;
+  $vars['revision_id'] = $revision_id;
+  $vars['pattern_component'] = patternbuilder_get_bundle_component($bundle);
 
   $view_mode = 'full';
   if (!empty($vars['elements']['#view_mode']) && isset($entity_info['view modes'][$vars['elements']['#view_mode']])) {
@@ -49,16 +54,25 @@ function template_preprocess_patternbuilder_item(&$vars) {
   }
   $vars['view_mode'] = $view_mode;
 
-  // Helpful $content variable for templates.
-  $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
+  // Build the content.
+  if (!empty($vars['pattern_component'])) {
+    // Patterns.
+    $vars['is_pattern'] = TRUE;
+    $vars['content'] = patternbuilder_render_schema($entity, $view_mode, $langcode);
+  }
+  else {
+    // Non-patterns.
+    $vars['is_pattern'] = FALSE;
+    $vars['content'] = $entity->view($view_mode);
+  }
 
   // Build css classes.
   $vars['classes_array'][] = drupal_html_class('patternbuilder-item--' . $bundle);
 
   // Add theme suggestions.
   $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $bundle;
-  if ($id = entity_id($entity_type, $entity)) {
-    $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $id;
+  if ($entity_id) {
+    $vars['theme_hook_suggestions'][] = 'patternbuilder_item__' . $entity_id;
   }
 }
 
@@ -89,7 +103,7 @@ function patternbuilder_render_schema(ParagraphsItemEntity $entity, $view_mode =
       }
     }
     catch (Exception $e) {
-      watchdog('patternbuilder', 'An error occurred while rendering the @bundle paragraph item (id:@id, revision:@vid) on @host_entity_type (id:@host_id, revision:@host_vid): @error.', array(
+      watchdog('patternbuilder', 'An error occurred while rendering the @bundle paragraph item (id:@id, revision:@vid) on @host_entity_type (id:@host_id, revision:@host_vid): @error', array(
         '@id' => $entity->item_id,
         '@vid' => $entity->revision_id,
         '@bundle' => $entity->bundle(),
@@ -124,7 +138,7 @@ function theme_patternbuilder_pattern_statuses($vars) {
   foreach ($vars['statuses'] as $status_key => $status) {
     $status_row = array();
     $status_row[] = t('@label (@name)', array(
-      '@label' => $status['label'],
+      '@label' => t($status['label']),
       '@name' => $status_key,
     ));
     $status_row[] = check_plain($status['module']);

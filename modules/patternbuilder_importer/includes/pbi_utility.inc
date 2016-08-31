@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Utility class for import classes.
@@ -484,6 +485,19 @@ class pbi_utility {
         return $number;
       }
     }
+  }
+
+  /**
+   * Determines if a property should be displayed in the preview.
+   *
+   * @param object $property
+   *   The property object.
+   *
+   * @return bool
+   *   TRUE if the property is a preview field.
+   */
+  public static function property_is_preview($property) {
+    return isset($property->options->preview) && static::is_boolean_set($property->options->preview);
   }
 
 }

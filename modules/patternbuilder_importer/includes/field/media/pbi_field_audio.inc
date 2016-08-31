@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal audio fields for pattern properties.

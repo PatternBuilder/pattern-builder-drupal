@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Interface for collapsible fields.

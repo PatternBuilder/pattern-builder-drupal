@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Class for creating Drupal fields for schema entity object properties.
@@ -16,7 +17,9 @@ abstract class pbi_field_entity_abstract extends pbi_field {
    *   An array keyed by the Drupal field property name with values of an array
    *   of schema property names in order of preference.
    */
-  abstract protected static function field_property_map_suggestions();
+  public static function field_property_map_suggestions() {
+    return array();
+  }
 
   /**
    * Determines the map of Drupal field properties to schema properties.
