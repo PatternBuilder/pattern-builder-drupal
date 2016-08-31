@@ -364,7 +364,9 @@ function patternbuilder_get($twig_arguments = array()) {
   $logger = new DrupalPatternBuilderLog();
   $retriever = new JsonSchema\Uri\UriRetriever();
   $resolver = new DrupalPatternBuilderRefResolver($retriever, 30);
-  $configuration = new PatternBuilder\Configuration\Configuration($logger, $twig, $resolver);
+  $developer_mode = variable_get('patternbuilder_developer_mode_enabled', FALSE);
+  $configuration = new PatternBuilder\Configuration\Configuration($logger, $twig, $resolver, $developer_mode);
+
   // TODO: schema object cache disabled until can effectively cache without
   // object / TWIG corruption on loading multiple of the same schema type.
   // See US83433, US70858.

@@ -8,24 +8,39 @@
  */
 
 use PatternBuilder\Property\PropertyInterface;
+use PatternBuilder\Property\PropertyAbstract;
 
 /**
  * Class to contain generic value data without a schema.
+ *
+ * TODO: Determine if this is needed anymore.
+ * The DrupalPatternBuilder::createPropertyComponent() creates property objects
+ * on the fly now, so the builder might not even fallback to this anymore.
  */
-class DrupalPatternBuilderValueProperty implements PropertyInterface {
+class DrupalPatternBuilderValueProperty extends PropertyAbstract implements PropertyInterface {
   protected $data;
 
   /**
    * Constructor for the component.
    */
   public function __construct() {
+    $this->initProperties();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function initProperties() {
     $this->data = new \stdClass();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function get($name) {
+  public function get($name = NULL) {
+    if (!isset($name)) {
+      return $this->data;
+    }
     return isset($this->data->{$name}) ? $this->data->{$name} : NULL;
   }
 
@@ -51,24 +66,7 @@ class DrupalPatternBuilderValueProperty implements PropertyInterface {
   /**
    * {@inheritdoc}
    */
-  public function render() {
-    $rendered = new \stdClass();
-    foreach ($this->data as $k => $value) {
-      if (is_object($value) && method_exists($value, 'render')) {
-        $rendered->{$k} = $value->render();
-      }
-      else {
-        $rendered->{$k} = $value;
-      }
-    }
-
-    return $rendered;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function prepareRender() {
+  public function value() {
     return $this->data;
   }
 

@@ -45,12 +45,7 @@ class DrupalPatternBuilderDisplayInstanceBoolean extends DrupalPatternBuilderDis
 
     $renders = array();
     foreach ($items as $delta => $item) {
-      if (isset($item['value']) && $item['value'] == $this->booleanOnValue) {
-        $renders[$delta] = TRUE;
-      }
-      else {
-        $renders[$delta] = FALSE;
-      }
+      $renders[$delta] = isset($item['value']) && $item['value'] == $this->booleanOnValue;
     }
 
     return $renders;
