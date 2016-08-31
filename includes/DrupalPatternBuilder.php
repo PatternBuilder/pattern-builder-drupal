@@ -651,39 +651,6 @@ class DrupalPatternBuilder {
   }
 
   /**
-   * Returns the map of field type to display handler class name.
-   *
-   * @return array
-   *   The map array.
-   */
-  public static function fieldDisplayInstanceHandlerTypeMap() {
-    return array(
-      'list_boolean' => 'DrupalPatternBuilderDisplayInstanceBoolean',
-    );
-  }
-
-  /**
-   * Determines the class name of the display handler.
-   *
-   * @param array $field_instance
-   *   The field instance info.
-   *
-   * @return string
-   *   The display handler class name.
-   */
-  protected static function fieldDisplayInstanceHandlerClass(array $field_instance) {
-    $class_name = static::FIELD_DISPLAY_INSTANCE_HANDLER_CLASS_DEFAULT;
-    $class_map = static::fieldDisplayInstanceHandlerTypeMap();
-    if ($class_map && isset($field_instance['field_name']) && ($field = field_info_field($field_instance['field_name'])) && !empty($field['type'])) {
-      if (isset($class_map[$field['type']])) {
-        $class_name = $class_map[$field['type']];
-      }
-    }
-
-    return $class_name;
-  }
-
-  /**
    * Creates an instance of the display handler.
    *
    * @param object $entity
